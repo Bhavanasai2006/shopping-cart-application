@@ -35,73 +35,14 @@ function Cart() {
     verifyAuthoritativeData();
   }, [verifyAuthoritativeData]);
 
-  async function checkout() {
+  function handleProceedToCheckout() {
     if (!user) {
-      navigate("/login", { state: { from: location } });
+      navigate("/login", { state: { from: { pathname: "/checkout" } } });
       return;
     }
 
     if (cart.length === 0) return;
-
-    setLoading(true);
-    setErrorMessage("");
-
-    try {
-      const isObjectId = (val) => /^[0-9a-fA-F]{24}$/.test(val);
-      const itemsPayload = cart
-        .filter((item) => isObjectId(item._id || item.productId))
-        .map((item) => ({
-          productId: item._id || item.productId,
-          quantity: item.cartQty
-        }));
-
-      if (itemsPayload.length === 0) {
-        await clearCart();
-        showToast({
-          type: "success",
-          message: "Order placed successfully! Thank you for choosing SOLE Skincare."
-        });
-        navigate("/products");
-        return;
-      }
-
-      const res = await authFetch(`${API_URL}/orders`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId: user.userId,
-          items: itemsPayload
-        })
-      });
-
-      const data = await res.json().catch(() => ({}));
-
-      if (!res.ok) {
-        if (res.status === 401) {
-          throw new Error("Session expired. Please log in again to complete your order.");
-        }
-        if (res.status === 403) {
-          throw new Error("Access forbidden: you do not have permission to place this order.");
-        }
-        throw new Error(data.message || "Checkout failed");
-      }
-
-      await clearCart();
-      showToast({
-        type: "success",
-        message: `Order #${data.orderId?.slice(-6).toUpperCase() || ""} placed successfully!`
-      });
-      navigate("/orders");
-    } catch (err) {
-      const safeErr = sanitizeErrorMessage(err, "An error occurred during checkout");
-      setErrorMessage(safeErr);
-      showToast({
-        type: "error",
-        message: safeErr
-      });
-    } finally {
-      setLoading(false);
-    }
+    navigate("/checkout");
   }
 
   function handleConfirmClearCart() {
@@ -332,22 +273,16 @@ function Cart() {
 
             <button
               className="checkout-pill-btn"
-              onClick={checkout}
-              disabled={loading}
+              onClick={handleProceedToCheckout}
+              disabled={loading || cart.length === 0}
               aria-label={
-                loading
-                  ? "Processing order..."
-                  : `Proceed to checkout for $${totals.grandTotal.toFixed(2)}`
+                totals.grandTotal > 0
+                  ? `Proceed to checkout for $${totals.grandTotal.toFixed(2)}`
+                  : "Proceed to checkout"
               }
             >
-              {loading ? (
-                <span className="btn-spinner-wrap">
-                  <span className="btn-spinner" aria-hidden="true" />
-                  Processing...
-                </span>
-              ) : (
-                "Checkout"
-              )}
+              <span>Proceed to Checkout</span>
+              <span className="checkout-btn-arrow" aria-hidden="true">→</span>
             </button>
           </div>
         </div>

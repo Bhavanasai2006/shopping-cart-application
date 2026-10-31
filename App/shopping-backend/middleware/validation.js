@@ -81,21 +81,112 @@ const loginValidation = {
     .strict()
 };
 
-// 3. Order Checkout Schema
+// Shipping Address Schema
+const shippingAddressSchema = z
+  .object({
+    fullName: z
+      .string()
+      .trim()
+      .min(2, "Full name must be at least 2 characters")
+      .max(80, "Full name cannot exceed 80 characters"),
+    phone: z
+      .string()
+      .trim()
+      .min(7, "Phone number must be at least 7 characters")
+      .max(20, "Phone number cannot exceed 20 characters"),
+    addressLine1: z
+      .string()
+      .trim()
+      .min(3, "Address line 1 must be at least 3 characters")
+      .max(120, "Address line 1 cannot exceed 120 characters"),
+    addressLine2: z
+      .string()
+      .trim()
+      .max(120, "Address line 2 cannot exceed 120 characters")
+      .optional()
+      .default(""),
+    city: z
+      .string()
+      .trim()
+      .min(2, "City must be at least 2 characters")
+      .max(60, "City cannot exceed 60 characters"),
+    state: z
+      .string()
+      .trim()
+      .min(2, "State must be at least 2 characters")
+      .max(60, "State cannot exceed 60 characters"),
+    postalCode: z
+      .string()
+      .trim()
+      .min(3, "Postal code must be at least 3 characters")
+      .max(20, "Postal code cannot exceed 20 characters"),
+    country: z
+      .string()
+      .trim()
+      .max(60, "Country cannot exceed 60 characters")
+      .optional()
+      .default("United States")
+  })
+  .strict();
+
+// 3. Order Checkout Schema - Idempotent, validated items & shipping address
 const orderValidation = {
   body: z
     .object({
-      // userId is accepted for legacy compatibility but is ignored for identity verification
       userId: z.string().optional(),
+      idempotencyKey: z
+        .string()
+        .trim()
+        .min(8, "Idempotency key must be at least 8 characters")
+        .max(128, "Idempotency key cannot exceed 128 characters")
+        .optional(),
       items: z
         .array(
           z.object({
             productId: objectIdSchema,
-            quantity: z.number().int().min(1, "Quantity must be at least 1")
+            quantity: z
+              .number()
+              .int("Quantity must be an integer")
+              .min(1, "Quantity must be at least 1")
+              .max(99, "Quantity per product cannot exceed 99 units")
           })
         )
         .min(1, "Order must contain at least one item")
-        .max(100, "Cannot order more than 100 distinct items")
+        .max(100, "Cannot order more than 100 distinct items"),
+      shippingAddress: shippingAddressSchema.optional()
+    })
+    .strict()
+};
+
+// Order Cancellation Schema
+const cancelOrderValidation = {
+  body: z
+    .object({
+      reason: z
+        .string()
+        .trim()
+        .max(200, "Cancellation reason cannot exceed 200 characters")
+        .optional()
+    })
+    .strict()
+    .optional()
+};
+
+// Order Status Update Schema (Admin)
+const updateOrderStatusValidation = {
+  body: z
+    .object({
+      status: z.enum(
+        ["placed", "processing", "shipped", "delivered", "cancelled"],
+        {
+          errorMap: () => ({ message: "Invalid order status value" })
+        }
+      ),
+      note: z
+        .string()
+        .trim()
+        .max(250, "Status update note cannot exceed 250 characters")
+        .optional()
     })
     .strict()
 };
@@ -233,5 +324,8 @@ module.exports = {
   verifyEmailValidation,
   objectIdParamValidation,
   createProductValidation,
-  updateProductValidation
+  updateProductValidation,
+  shippingAddressSchema,
+  cancelOrderValidation,
+  updateOrderStatusValidation
 };

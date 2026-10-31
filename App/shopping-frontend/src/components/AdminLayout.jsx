@@ -25,6 +25,7 @@ function AdminLayout({ children, title, subtitle, actionButton }) {
         <div className="admin-header-container">
           <div className="admin-header-brand">
             <Link to="/admin/dashboard" className="admin-brand-link">
+              <img src="/sole-logo.png" alt="SOLE Logo" className="admin-brand-icon" />
               <span className="admin-brand-title">SOLE</span>
               <span className="admin-brand-tag">PORTAL</span>
             </Link>

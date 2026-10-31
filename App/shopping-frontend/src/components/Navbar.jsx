@@ -50,7 +50,8 @@ function Navbar({ onSearchToggle }) {
 
         {/* Center: Brand Logo */}
         <Link to="/products" className="sole-brand-logo" aria-label="SOLE Home">
-          SOLE
+          <img src="/sole-logo.png" alt="SOLE Logo" className="sole-brand-icon" />
+          <span className="sole-brand-text">SOLE</span>
         </Link>
 
         {/* Right Actions */}
@@ -121,7 +122,10 @@ function Navbar({ onSearchToggle }) {
             aria-label="Site Navigation"
           >
             <div className="drawer-header">
-              <span className="drawer-logo">SOLE</span>
+              <span className="drawer-logo">
+                <img src="/sole-logo.png" alt="SOLE Logo" className="drawer-logo-icon" />
+                <span>SOLE</span>
+              </span>
               <button
                 className="drawer-close-btn"
                 onClick={() => setMenuOpen(false)}

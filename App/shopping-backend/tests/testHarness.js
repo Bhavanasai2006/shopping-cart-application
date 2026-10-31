@@ -61,6 +61,48 @@ function createMongooseDoc(collectionName, data) {
 
 // Intercept Mongoose Model Methods
 function setupMockDatabase() {
+  // SESSION & TRANSACTION MOCK FOR INTEGRATION TESTS
+  let activeSnapshot = null;
+  mongoose.startSession = async () => {
+    let inTxn = false;
+    return {
+      startTransaction() {
+        inTxn = true;
+        // Deep clone current state for rollback simulation
+        activeSnapshot = {
+          products: store.products.map((p) => ({ ...p, _id: p._id })),
+          orders: store.orders.map((o) => ({ ...o, _id: o._id })),
+          carts: store.carts.map((c) => ({ ...c, _id: c._id }))
+        };
+      },
+      async commitTransaction() {
+        inTxn = false;
+        activeSnapshot = null;
+      },
+      async abortTransaction() {
+        inTxn = false;
+        if (activeSnapshot) {
+          store.products = activeSnapshot.products.map((p) =>
+            createMongooseDoc("products", p)
+          );
+          store.orders = activeSnapshot.orders.map((o) =>
+            createMongooseDoc("orders", o)
+          );
+          store.carts = activeSnapshot.carts.map((c) =>
+            createMongooseDoc("carts", c)
+          );
+          activeSnapshot = null;
+        }
+      },
+      async endSession() {
+        inTxn = false;
+      },
+      inTransaction() {
+        return inTxn;
+      }
+    };
+  };
+
   // USER MODEL
   User.findOne = async (query) => {
     const raw = store.users.find((u) => {
@@ -213,6 +255,9 @@ function setupMockDatabase() {
       if (query.quantity && query.quantity.$gte != null) {
         if (prod.quantity < query.quantity.$gte) return false;
       }
+      if (query.isActive != null && query.isActive.$ne != null) {
+        if (prod.isActive === query.isActive.$ne) return false;
+      }
       return true;
     });
 
@@ -264,6 +309,11 @@ function setupMockDatabase() {
 
   // ORDER MODEL
   Order.create = async (data) => {
+    if (Array.isArray(data)) {
+      const docs = data.map((d) => createMongooseDoc("orders", d));
+      store.orders.push(...docs);
+      return docs;
+    }
     const doc = createMongooseDoc("orders", data);
     store.orders.push(doc);
     return doc;
@@ -370,5 +420,6 @@ function resetDb() {
 module.exports = {
   store,
   setupMockDatabase,
-  resetDb
+  resetDb,
+  createMongooseDoc
 };

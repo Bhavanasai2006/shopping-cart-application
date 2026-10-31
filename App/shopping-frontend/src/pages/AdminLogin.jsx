@@ -76,7 +76,8 @@ function AdminLogin() {
       <div className="admin-login-card">
         <div className="admin-login-header">
           <Link to="/products" className="admin-login-brand">
-            SOLE
+            <img src="/sole-logo.png" alt="SOLE Logo" className="admin-login-icon" />
+            <span>SOLE</span>
           </Link>
           <span className="admin-login-badge">ADMINISTRATIVE ACCESS</span>
           <p className="admin-login-subtitle">

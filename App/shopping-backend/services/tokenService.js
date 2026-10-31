@@ -9,7 +9,7 @@ function hashToken(rawToken) {
 
 function generateAccessToken(user) {
   const payload = {
-    id: user._id ? user._id.toString() : user.id,
+    id: user._id ? user._id.toString() : (user.id || user.userId),
     username: user.username,
     emailId: user.emailId,
     role: user.role || "customer"
