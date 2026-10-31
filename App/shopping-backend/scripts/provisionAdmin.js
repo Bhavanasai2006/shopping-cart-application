@@ -8,6 +8,16 @@
  * - Uses existing bcrypt hashing with configured salt rounds.
  */
 
+// Gracefully configure DNS for environments with restrictive local DNS
+if (process.env.CUSTOM_DNS !== "false") {
+  try {
+    const dns = require("node:dns");
+    dns.setServers(["8.8.8.8", "1.1.1.1"]);
+  } catch (err) {
+    // Non-fatal if system restricts DNS overrides
+  }
+}
+
 const readline = require("readline");
 const mongoose = require("mongoose");
 const config = require("../config/env");
