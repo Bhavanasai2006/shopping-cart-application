@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import API_URL from "../api";
@@ -20,6 +19,7 @@ function Login({ setUser }) {
         headers: {
           "Content-Type": "application/json"
         },
+        credentials: "include",
         body: JSON.stringify({ emailId, password })
       });
 
@@ -31,7 +31,9 @@ function Login({ setUser }) {
 
       const loggedInUser = {
         userId: data.userId,
-        username: data.username
+        username: data.username,
+        role: data.role || "customer",
+        accessToken: data.accessToken
       };
 
       localStorage.setItem(

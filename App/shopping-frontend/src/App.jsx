@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 
@@ -7,6 +6,7 @@ import Register from "./pages/Register";
 import Login from "./pages/Login";
 import Products from "./pages/Products";
 import Cart from "./pages/Cart";
+import API_URL from "./api";
 
 function App() {
   const [cart, setCart] = useState([]);
@@ -16,7 +16,15 @@ function App() {
     return saved ? JSON.parse(saved) : null;
   });
 
-  function logout() {
+  async function logout() {
+    try {
+      await fetch(`${API_URL}/auth/logout`, {
+        method: "POST",
+        credentials: "include"
+      });
+    } catch {
+      // Safe fallback if network error
+    }
     localStorage.removeItem("shopUser");
     setUser(null);
     setCart([]);

@@ -1,11 +1,12 @@
 {
   "name": "shopping-backend",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Shopping Cart Application Backend with Security Foundation",
+  "main": "controller.js",
   "scripts": {
+    "start": "node controller.js",
     "dev": "nodemon ./controller.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node --test tests/**/*.test.js"
   },
   "keywords": [],
   "author": "",
@@ -13,11 +14,19 @@
   "type": "commonjs",
   "dependencies": {
     "bcryptjs": "^3.0.3",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
+    "dotenv": "^18.0.9",
     "express": "^5.3.0",
-    "mongoose": "^9.11.3"
+    "express-rate-limit": "^8.7.2",
+    "helmet": "^8.3.0",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^9.11.3",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
-    "nodemon": "^3.1.14"
+    "mongodb-memory-server": "^11.3.0",
+    "nodemon": "^3.1.14",
+    "supertest": "^7.3.1"
   }
 }

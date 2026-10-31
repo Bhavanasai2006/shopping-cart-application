@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import API_URL from "../api";
@@ -39,11 +38,18 @@ function Cart({ cart, setCart, user }) {
     setMessage("");
 
     try {
+      const authHeaders = {
+        "Content-Type": "application/json"
+      };
+
+      if (user.accessToken) {
+        authHeaders["Authorization"] = `Bearer ${user.accessToken}`;
+      }
+
       const res = await fetch(`${API_URL}/orders`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
+        headers: authHeaders,
+        credentials: "include",
         body: JSON.stringify({
           userId: user.userId,
           items: cart.map((item) => ({
