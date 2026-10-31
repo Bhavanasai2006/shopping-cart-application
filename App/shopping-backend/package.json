@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node controller.js",
     "dev": "nodemon ./controller.js",
+    "seed": "node seedBeautyProducts.js",
     "test": "node --test tests/**/*.test.js"
   },
   "keywords": [],
