@@ -583,7 +583,10 @@ async function createProductHandler(req, res, next) {
       isActive
     } = req.body;
 
+    const generatedId = new mongoose.Types.ObjectId();
     const product = await Product.create({
+      _id: generatedId,
+      productId: req.body.productId ? String(req.body.productId).trim() : `prod_${generatedId}`,
       productName: String(productName).trim(),
       productPrice: Number(productPrice),
       originalPrice: originalPrice != null ? Number(originalPrice) : null,

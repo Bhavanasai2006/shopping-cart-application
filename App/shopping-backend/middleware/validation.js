@@ -151,6 +151,7 @@ const objectIdParamValidation = {
 const createProductValidation = {
   body: z
     .object({
+      productId: z.string().trim().max(100, "Product ID cannot exceed 100 characters").optional(),
       productName: z
         .string({ required_error: "Product name is required" })
         .trim()
@@ -187,6 +188,7 @@ const updateProductValidation = {
   }),
   body: z
     .object({
+      productId: z.string().trim().max(100, "Product ID cannot exceed 100 characters").optional(),
       productName: z
         .string()
         .trim()
