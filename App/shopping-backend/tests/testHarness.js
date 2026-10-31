@@ -108,6 +108,37 @@ function setupMockDatabase() {
     return doc;
   };
 
+  function filterItems(items, query = {}) {
+    return items.filter((item) => {
+      for (const [k, v] of Object.entries(query)) {
+        if (k === "$or" && Array.isArray(v)) {
+          const matchOr = v.some((orCondition) => {
+            for (const [orK, orV] of Object.entries(orCondition)) {
+              if (orV instanceof RegExp) {
+                if (orV.test(item[orK] || "")) return true;
+              } else if (item[orK] === orV) {
+                return true;
+              }
+            }
+            return false;
+          });
+          if (!matchOr) return false;
+        } else if (v && typeof v === "object" && "$ne" in v) {
+          if (item[k] === v.$ne) return false;
+        } else if (v && typeof v === "object" && ("$gte" in v || "$lte" in v || "$gt" in v)) {
+          if (v.$gte != null && item[k] < v.$gte) return false;
+          if (v.$lte != null && item[k] > v.$lte) return false;
+          if (v.$gt != null && item[k] <= v.$gt) return false;
+        } else if (v instanceof RegExp) {
+          if (!v.test(item[k] || "")) return false;
+        } else if (item[k] !== v) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }
+
   User.find = () => {
     const chain = {
       select: () => store.users.map((u) => u.toJSON()),
@@ -116,25 +147,58 @@ function setupMockDatabase() {
     return chain;
   };
 
+  User.countDocuments = async (query = {}) => {
+    return filterItems(store.users, query).length;
+  };
+
   // PRODUCT MODEL
-  Product.find = () => {
+  Product.find = (query = {}) => {
+    const filtered = filterItems(store.products, query);
     const chain = {
       sort: () => chain,
-      skip: () => chain,
-      limit: () => chain,
-      select: () => store.products,
-      then: (resolve) => resolve(store.products)
+      skip: (n) => {
+        const next = filtered.slice(n);
+        return {
+          limit: (m) => ({
+            select: () => next.slice(0, m),
+            then: (resolve) => resolve(next.slice(0, m))
+          }),
+          select: () => next,
+          then: (resolve) => resolve(next)
+        };
+      },
+      limit: (m) => ({
+        select: () => filtered.slice(0, m),
+        then: (resolve) => resolve(filtered.slice(0, m))
+      }),
+      select: () => filtered,
+      then: (resolve) => resolve(filtered)
     };
     return chain;
   };
 
+  Product.countDocuments = async (query = {}) => {
+    return filterItems(store.products, query).length;
+  };
+
   Product.findById = async (id) => {
-    const p = store.products.find((prod) => prod._id.toString() === id.toString());
-    if (!p) return null;
-    return {
-      ...p,
-      select: () => p
-    };
+    const raw = store.products.find((prod) => prod._id.toString() === id.toString());
+    if (!raw) return null;
+    if (typeof raw.save !== "function") {
+      const wrapped = createMongooseDoc("products", raw);
+      const idx = store.products.indexOf(raw);
+      if (idx !== -1) store.products[idx] = wrapped;
+      return wrapped;
+    }
+    return raw;
+  };
+
+  Product.findByIdAndDelete = async (id) => {
+    const idx = store.products.findIndex((prod) => prod._id.toString() === id.toString());
+    if (idx !== -1) {
+      return store.products.splice(idx, 1)[0];
+    }
+    return null;
   };
 
   Product.create = async (data) => {
@@ -211,6 +275,30 @@ function setupMockDatabase() {
     );
   };
 
+  Order.countDocuments = async (query = {}) => {
+    return filterItems(store.orders, query).length;
+  };
+
+  Order.findOne = async (query = {}) => {
+    return (
+      store.orders.find((o) => {
+        if (query["items.productId"]) {
+          const targetId = query["items.productId"].toString();
+          const hasItem =
+            o.items &&
+            o.items.some(
+              (i) => (i.productId?._id || i.productId).toString() === targetId
+            );
+          if (!hasItem) return false;
+        }
+        for (const [k, v] of Object.entries(query)) {
+          if (k !== "items.productId" && o[k] !== v) return false;
+        }
+        return true;
+      }) || null
+    );
+  };
+
   Order.find = (query = {}) => {
     let filtered = store.orders;
     if (query.userId) {
@@ -219,7 +307,9 @@ function setupMockDatabase() {
       );
     }
     const chain = {
-      sort: () => filtered,
+      populate: () => chain,
+      select: () => chain,
+      sort: () => chain,
       then: (resolve) => resolve(filtered)
     };
     return chain;

@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 
 import { AuthProvider } from "./context/AuthContext";
 import { CartProvider } from "./context/CartContext";
@@ -15,24 +15,38 @@ import Cart from "./pages/Cart";
 import Wishlist from "./pages/Wishlist";
 import Orders from "./pages/Orders";
 import Profile from "./pages/Profile";
+
+// Admin Portal Pages
+import AdminLogin from "./pages/AdminLogin";
+import AdminDashboard from "./pages/AdminDashboard";
 import AdminProducts from "./pages/AdminProducts";
+import AdminProductForm from "./pages/AdminProductForm";
+import AdminOrders from "./pages/AdminOrders";
 
 function AppContent() {
+  const location = useLocation();
+  const isAdminRoute = location.pathname.startsWith("/admin");
+
   return (
-    <div className="sole-app-wrapper">
+    <div className={`sole-app-wrapper ${isAdminRoute ? "admin-mode" : ""}`}>
       <a href="#main-content" className="skip-to-content">
         Skip to main content
       </a>
 
-      <Navbar />
+      {!isAdminRoute && <Navbar />}
 
-      <main id="main-content" className="sole-main-content" tabIndex="-1">
+      <main
+        id="main-content"
+        className={isAdminRoute ? "sole-admin-content" : "sole-main-content"}
+        tabIndex="-1"
+      >
         <Routes>
           <Route path="/" element={<Navigate to="/products" replace />} />
 
           {/* Public Auth Routes */}
           <Route path="/register" element={<Register />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/admin/login" element={<AdminLogin />} />
 
           {/* Catalog, Product Detail, Cart & Wishlist */}
           <Route path="/products" element={<Products />} />
@@ -40,7 +54,7 @@ function AppContent() {
           <Route path="/cart" element={<Cart />} />
           <Route path="/wishlist" element={<Wishlist />} />
 
-          {/* Protected Routes (UX Protection + Session checks) */}
+          {/* Protected Customer Routes */}
           <Route
             path="/profile"
             element={
@@ -57,11 +71,49 @@ function AppContent() {
               </ProtectedRoute>
             }
           />
+
+          {/* Protected Admin Routes */}
           <Route
             path="/admin"
+            element={<Navigate to="/admin/dashboard" replace />}
+          />
+          <Route
+            path="/admin/dashboard"
+            element={
+              <ProtectedRoute adminOnly>
+                <AdminDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/products"
             element={
               <ProtectedRoute adminOnly>
                 <AdminProducts />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/products/new"
+            element={
+              <ProtectedRoute adminOnly>
+                <AdminProductForm />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/products/edit/:id"
+            element={
+              <ProtectedRoute adminOnly>
+                <AdminProductForm isEdit />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/orders"
+            element={
+              <ProtectedRoute adminOnly>
+                <AdminOrders />
               </ProtectedRoute>
             }
           />
@@ -71,7 +123,7 @@ function AppContent() {
         </Routes>
       </main>
 
-      <BottomNav />
+      {!isAdminRoute && <BottomNav />}
     </div>
   );
 }

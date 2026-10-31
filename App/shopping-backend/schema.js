@@ -135,6 +135,10 @@ const productSchema = new mongoose.Schema({
   ingredients: {
     type: String,
     default: ""
+  },
+  isActive: {
+    type: Boolean,
+    default: true
   }
 });
 

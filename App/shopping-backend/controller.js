@@ -53,7 +53,9 @@ const {
   requestPasswordResetValidation,
   resetPasswordValidation,
   verifyEmailValidation,
-  objectIdParamValidation
+  objectIdParamValidation,
+  createProductValidation,
+  updateProductValidation
 } = require("./middleware/validation");
 
 const { notFoundHandler, errorHandler } = require("./middleware/errorHandler");
@@ -488,7 +490,8 @@ app.post(
 app.get("/api/products", async (req, res, next) => {
   try {
     const { category, search, minPrice, maxPrice, sortBy, page, limit } = req.query;
-    const query = {};
+    // Exclude deactivated/archived products from public catalog
+    const query = { isActive: { $ne: false } };
 
     if (category && category !== "All") {
       query.category = { $regex: new RegExp(`^${category}$`, "i") };
@@ -553,7 +556,7 @@ app.get("/api/products", async (req, res, next) => {
 app.get("/api/products/:id", validate(objectIdParamValidation), async (req, res, next) => {
   try {
     const product = await Product.findById(req.params.id).select("-__v");
-    if (!product) {
+    if (!product || product.isActive === false) {
       return res.status(404).json({ message: "Product not found" });
     }
     return res.json(product);
@@ -562,55 +565,55 @@ app.get("/api/products/:id", validate(objectIdParamValidation), async (req, res,
   }
 });
 
-// CREATE PRODUCT (Admin only - RBAC protected)
+// Shared Admin Product Creation Logic
+async function createProductHandler(req, res, next) {
+  try {
+    const {
+      productName,
+      productPrice,
+      originalPrice,
+      image,
+      size,
+      subtitle,
+      category,
+      quantity,
+      description,
+      howToUse,
+      ingredients,
+      isActive
+    } = req.body;
+
+    const product = await Product.create({
+      productName: String(productName).trim(),
+      productPrice: Number(productPrice),
+      originalPrice: originalPrice != null ? Number(originalPrice) : null,
+      image: image ? String(image).trim() : "",
+      size: size ? String(size).trim() : "50 ml",
+      subtitle: subtitle ? String(subtitle).trim() : "",
+      category: category ? String(category).trim() : "Skincare",
+      quantity: Number(quantity),
+      description: description ? String(description).trim() : "",
+      howToUse: howToUse ? String(howToUse).trim() : "",
+      ingredients: ingredients ? String(ingredients).trim() : "",
+      isActive: isActive !== false
+    });
+
+    return res.status(201).json({
+      message: "Product created successfully",
+      product
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// CREATE PRODUCT (Legacy endpoint, admin-only & validated)
 app.post(
   "/api/products",
   authenticate,
   requireAdmin,
-  async (req, res, next) => {
-    try {
-      const {
-        productName,
-        productPrice,
-        originalPrice,
-        image,
-        size,
-        subtitle,
-        category,
-        quantity,
-        description,
-        howToUse,
-        ingredients
-      } = req.body;
-
-      if (!productName || productPrice == null || quantity == null) {
-        return res.status(400).json({
-          message: "Product name, price and quantity are required"
-        });
-      }
-
-      const product = await Product.create({
-        productName: String(productName).trim(),
-        productPrice: Number(productPrice),
-        originalPrice: originalPrice != null ? Number(originalPrice) : null,
-        image: image ? String(image).trim() : "",
-        size: size ? String(size).trim() : "50 ml",
-        subtitle: subtitle ? String(subtitle).trim() : "",
-        category: category ? String(category).trim() : "Skincare",
-        quantity: Number(quantity),
-        description: description ? String(description).trim() : "",
-        howToUse: howToUse ? String(howToUse).trim() : "",
-        ingredients: ingredients ? String(ingredients).trim() : ""
-      });
-
-      return res.status(201).json({
-        message: "Product created successfully",
-        product
-      });
-    } catch (err) {
-      next(err);
-    }
-  }
+  validate(createProductValidation),
+  createProductHandler
 );
 
 // -------------------------------------------------------------
@@ -996,6 +999,294 @@ app.get("/api/admin/users", authenticate, requireAdmin, async (_req, res, next) 
   try {
     const users = await User.find().select("-password -__v");
     return res.json(users);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// 1. ADMIN PRODUCTS LISTING (Full catalog including active/inactive status and metrics)
+app.get("/api/admin/products", authenticate, requireAdmin, async (req, res, next) => {
+  try {
+    const { category, search, status, sortBy, page, limit } = req.query;
+    const query = {};
+
+    if (category && category !== "All") {
+      query.category = { $regex: new RegExp(`^${category}$`, "i") };
+    }
+
+    if (status === "active") {
+      query.isActive = { $ne: false };
+    } else if (status === "inactive") {
+      query.isActive = false;
+    }
+
+    if (search) {
+      const searchRegex = new RegExp(String(search).trim(), "i");
+      query.$or = [
+        { productName: searchRegex },
+        { description: searchRegex },
+        { subtitle: searchRegex },
+        { category: searchRegex }
+      ];
+    }
+
+    let sortOption = { _id: -1 };
+    if (sortBy === "price-asc") sortOption = { productPrice: 1 };
+    else if (sortBy === "price-desc") sortOption = { productPrice: -1 };
+    else if (sortBy === "name-asc") sortOption = { productName: 1 };
+    else if (sortBy === "name-desc") sortOption = { productName: -1 };
+    else if (sortBy === "stock-asc") sortOption = { quantity: 1 };
+    else if (sortBy === "stock-desc") sortOption = { quantity: -1 };
+
+    const [totalAll, totalActive, totalInactive, totalLowStock, totalOutOfStock] = await Promise.all([
+      Product.countDocuments({}),
+      Product.countDocuments({ isActive: { $ne: false } }),
+      Product.countDocuments({ isActive: false }),
+      Product.countDocuments({ quantity: { $gt: 0, $lte: 5 } }),
+      Product.countDocuments({ quantity: 0 })
+    ]);
+
+    if (page && limit) {
+      const pageNum = Math.max(1, parseInt(page, 10) || 1);
+      const limitNum = Math.max(1, parseInt(limit, 10) || 10);
+      const skip = (pageNum - 1) * limitNum;
+
+      const [products, filteredTotal] = await Promise.all([
+        Product.find(query).sort(sortOption).skip(skip).limit(limitNum).select("-__v"),
+        Product.countDocuments(query)
+      ]);
+
+      return res.json({
+        products,
+        total: filteredTotal,
+        totalAll,
+        totalActive,
+        totalInactive,
+        totalLowStock,
+        totalOutOfStock,
+        page: pageNum,
+        totalPages: Math.ceil(filteredTotal / limitNum)
+      });
+    }
+
+    const products = await Product.find(query).sort(sortOption).select("-__v");
+    return res.json({
+      products,
+      total: products.length,
+      totalAll,
+      totalActive,
+      totalInactive,
+      totalLowStock,
+      totalOutOfStock
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// 2. ADMIN CREATE PRODUCT
+app.post(
+  "/api/admin/products",
+  authenticate,
+  requireAdmin,
+  validate(createProductValidation),
+  createProductHandler
+);
+
+// 3. ADMIN GET PRODUCT BY ID (Includes inactive products)
+app.get(
+  "/api/admin/products/:id",
+  authenticate,
+  requireAdmin,
+  validate(objectIdParamValidation),
+  async (req, res, next) => {
+    try {
+      const product = await Product.findById(req.params.id).select("-__v");
+      if (!product) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+      return res.json(product);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// 4. ADMIN UPDATE PRODUCT (Allowlisted fields with mass-assignment protection)
+app.patch(
+  "/api/admin/products/:id",
+  authenticate,
+  requireAdmin,
+  validate(updateProductValidation),
+  async (req, res, next) => {
+    try {
+      const product = await Product.findById(req.params.id);
+      if (!product) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+
+      const allowedFields = [
+        "productName",
+        "subtitle",
+        "productPrice",
+        "originalPrice",
+        "category",
+        "size",
+        "quantity",
+        "description",
+        "howToUse",
+        "ingredients",
+        "image",
+        "isActive"
+      ];
+
+      for (const field of allowedFields) {
+        if (req.body[field] !== undefined) {
+          if (field === "productPrice" || field === "quantity") {
+            product[field] = Number(req.body[field]);
+          } else if (field === "originalPrice") {
+            product[field] = req.body[field] != null ? Number(req.body[field]) : null;
+          } else if (typeof req.body[field] === "string") {
+            product[field] = req.body[field].trim();
+          } else {
+            product[field] = req.body[field];
+          }
+        }
+      }
+
+      await product.save();
+
+      return res.json({
+        message: "Product updated successfully",
+        product
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// 5. ADMIN DEACTIVATE / SOFT-DELETE PRODUCT (Preserves order and cart history)
+app.delete(
+  "/api/admin/products/:id",
+  authenticate,
+  requireAdmin,
+  validate(objectIdParamValidation),
+  async (req, res, next) => {
+    try {
+      const product = await Product.findById(req.params.id);
+      if (!product) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+
+      // If permanent delete is explicitly requested, prevent breaking existing orders
+      if (req.query.permanent === "true") {
+        const orderUsingProduct = await Order.findOne({ "items.productId": product._id });
+        if (orderUsingProduct) {
+          product.isActive = false;
+          await product.save();
+          return res.status(409).json({
+            message:
+              "Cannot permanently delete product referenced in customer order history. Product safely deactivated instead.",
+            product
+          });
+        }
+        await Product.findByIdAndDelete(product._id);
+        return res.json({
+          message: "Product permanently removed from database",
+          productId: product._id
+        });
+      }
+
+      // Safe deactivation
+      product.isActive = false;
+      await product.save();
+
+      return res.json({
+        message: "Product deactivated successfully",
+        product
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// 6. ADMIN REACTIVATE PRODUCT
+app.post(
+  "/api/admin/products/:id/reactivate",
+  authenticate,
+  requireAdmin,
+  validate(objectIdParamValidation),
+  async (req, res, next) => {
+    try {
+      const product = await Product.findById(req.params.id);
+      if (!product) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+
+      product.isActive = true;
+      await product.save();
+
+      return res.json({
+        message: "Product reactivated successfully",
+        product
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// 7. ADMIN ORDERS OVERVIEW
+app.get("/api/admin/orders", authenticate, requireAdmin, async (_req, res, next) => {
+  try {
+    const orders = await Order.find()
+      .populate("userId", "username emailId role")
+      .sort({ createdAt: -1 });
+    return res.json(orders);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// 8. ADMIN DASHBOARD STATS
+app.get("/api/admin/stats", authenticate, requireAdmin, async (_req, res, next) => {
+  try {
+    const [
+      totalProducts,
+      activeProducts,
+      inactiveProducts,
+      lowStockProducts,
+      outOfStockProducts,
+      totalOrders,
+      totalUsers,
+      allOrders
+    ] = await Promise.all([
+      Product.countDocuments({}),
+      Product.countDocuments({ isActive: { $ne: false } }),
+      Product.countDocuments({ isActive: false }),
+      Product.countDocuments({ quantity: { $gt: 0, $lte: 5 } }),
+      Product.countDocuments({ quantity: 0 }),
+      Order.countDocuments({}),
+      User.countDocuments({ role: "customer" }),
+      Order.find({}).select("totalAmount")
+    ]);
+
+    const totalRevenue = allOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+
+    return res.json({
+      stats: {
+        totalProducts,
+        activeProducts,
+        inactiveProducts,
+        lowStockProducts,
+        outOfStockProducts,
+        totalOrders,
+        totalUsers,
+        totalRevenue: Math.round(totalRevenue * 100) / 100
+      }
+    });
   } catch (err) {
     next(err);
   }

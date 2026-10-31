@@ -154,7 +154,7 @@ function Navbar({ onSearchToggle }) {
 
                   {user.role === "admin" && (
                     <Link
-                      to="/admin"
+                      to="/admin/dashboard"
                       className="admin-link-highlight"
                       onClick={() => setMenuOpen(false)}
                     >
