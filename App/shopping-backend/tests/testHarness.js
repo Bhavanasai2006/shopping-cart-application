@@ -1,12 +1,13 @@
 const mongoose = require("mongoose");
-const { User, Product, Order, RefreshToken } = require("../schema");
+const { User, Product, Order, RefreshToken, Cart } = require("../schema");
 
 // In-memory collections
 const store = {
   users: [],
   products: [],
   orders: [],
-  refreshTokens: []
+  refreshTokens: [],
+  carts: []
 };
 
 function createMongooseDoc(collectionName, data) {
@@ -23,6 +24,21 @@ function createMongooseDoc(collectionName, data) {
       );
       if (idx !== -1) {
         store[collectionName][idx] = this;
+      }
+      return this;
+    },
+    async populate(field) {
+      if (field === "items.productId" && Array.isArray(this.items)) {
+        this.items = this.items.map((item) => {
+          const rawId = item.productId?._id || item.productId;
+          const found = store.products.find(
+            (p) => p._id.toString() === rawId.toString()
+          );
+          return {
+            ...item,
+            productId: found || null
+          };
+        });
       }
       return this;
     },
@@ -103,6 +119,9 @@ function setupMockDatabase() {
   // PRODUCT MODEL
   Product.find = () => {
     const chain = {
+      sort: () => chain,
+      skip: () => chain,
+      limit: () => chain,
       select: () => store.products,
       then: (resolve) => resolve(store.products)
     };
@@ -110,9 +129,12 @@ function setupMockDatabase() {
   };
 
   Product.findById = async (id) => {
-    return (
-      store.products.find((p) => p._id.toString() === id.toString()) || null
-    );
+    const p = store.products.find((prod) => prod._id.toString() === id.toString());
+    if (!p) return null;
+    return {
+      ...p,
+      select: () => p
+    };
   };
 
   Product.create = async (data) => {
@@ -139,6 +161,41 @@ function setupMockDatabase() {
     }
 
     return { modifiedCount: 1 };
+  };
+
+  // CART MODEL
+  Cart.findOne = async (query) => {
+    const raw = store.carts.find((c) => {
+      if (query.userId && c.userId.toString() !== query.userId.toString()) return false;
+      return true;
+    });
+    if (!raw) return null;
+    if (typeof raw.save !== "function") {
+      const wrapped = createMongooseDoc("carts", raw);
+      const idx = store.carts.indexOf(raw);
+      if (idx !== -1) store.carts[idx] = wrapped;
+      return wrapped;
+    }
+    return raw;
+  };
+
+  Cart.create = async (data) => {
+    const doc = createMongooseDoc("carts", { items: [], ...data });
+    store.carts.push(doc);
+    return doc;
+  };
+
+  Cart.findOneAndUpdate = async (query, update) => {
+    const cart = store.carts.find((c) => {
+      if (query.userId && c.userId.toString() !== query.userId.toString()) return false;
+      return true;
+    });
+    if (cart) {
+      if (update.$set && update.$set.items) {
+        cart.items = update.$set.items;
+      }
+    }
+    return cart || null;
   };
 
   // ORDER MODEL
@@ -217,6 +274,7 @@ function resetDb() {
   store.products = [];
   store.orders = [];
   store.refreshTokens = [];
+  store.carts = [];
 }
 
 module.exports = {

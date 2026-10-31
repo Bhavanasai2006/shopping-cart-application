@@ -1,107 +1,90 @@
-import { useState } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 
+import { AuthProvider } from "./context/AuthContext";
+import { CartProvider } from "./context/CartContext";
+import { ToastProvider } from "./context/ToastContext";
+import ProtectedRoute from "./components/ProtectedRoute";
 import Navbar from "./components/Navbar";
+import BottomNav from "./components/BottomNav";
+
 import Register from "./pages/Register";
 import Login from "./pages/Login";
 import Products from "./pages/Products";
+import ProductDetail from "./pages/ProductDetail";
 import Cart from "./pages/Cart";
-import API_URL from "./api";
+import Wishlist from "./pages/Wishlist";
+import Orders from "./pages/Orders";
+import Profile from "./pages/Profile";
+import AdminProducts from "./pages/AdminProducts";
+
+function AppContent() {
+  return (
+    <div className="sole-app-wrapper">
+      <a href="#main-content" className="skip-to-content">
+        Skip to main content
+      </a>
+
+      <Navbar />
+
+      <main id="main-content" className="sole-main-content" tabIndex="-1">
+        <Routes>
+          <Route path="/" element={<Navigate to="/products" replace />} />
+
+          {/* Public Auth Routes */}
+          <Route path="/register" element={<Register />} />
+          <Route path="/login" element={<Login />} />
+
+          {/* Catalog, Product Detail, Cart & Wishlist */}
+          <Route path="/products" element={<Products />} />
+          <Route path="/products/:id" element={<ProductDetail />} />
+          <Route path="/cart" element={<Cart />} />
+          <Route path="/wishlist" element={<Wishlist />} />
+
+          {/* Protected Routes (UX Protection + Session checks) */}
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <Profile />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/orders"
+            element={
+              <ProtectedRoute>
+                <Orders />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute adminOnly>
+                <AdminProducts />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Fallback */}
+          <Route path="*" element={<Navigate to="/products" replace />} />
+        </Routes>
+      </main>
+
+      <BottomNav />
+    </div>
+  );
+}
 
 function App() {
-  const [cart, setCart] = useState([]);
-
-  const [user, setUser] = useState(() => {
-    const saved = localStorage.getItem("shopUser");
-    return saved ? JSON.parse(saved) : null;
-  });
-
-  async function logout() {
-    try {
-      await fetch(`${API_URL}/auth/logout`, {
-        method: "POST",
-        credentials: "include"
-      });
-    } catch {
-      // Safe fallback if network error
-    }
-    localStorage.removeItem("shopUser");
-    setUser(null);
-    setCart([]);
-  }
-
-  function addToCart(product) {
-    setCart((prev) => {
-      const existing = prev.find(
-        (item) => item._id === product._id
-      );
-
-      const currentQty = existing ? existing.cartQty : 0;
-
-      if (currentQty >= product.quantity) {
-        alert("No more stock available!");
-        return prev;
-      }
-
-      if (existing) {
-        return prev.map((item) =>
-          item._id === product._id
-            ? { ...item, cartQty: item.cartQty + 1 }
-            : item
-        );
-      }
-
-      return [...prev, { ...product, cartQty: 1 }];
-    });
-  }
-
   return (
-    <>
-      <Navbar user={user} cart={cart} logout={logout} />
-
-      <Routes>
-        <Route
-          path="/"
-          element={<Navigate to="/products" replace />}
-        />
-
-        <Route
-          path="/register"
-          element={<Register />}
-        />
-
-        <Route
-          path="/login"
-          element={<Login setUser={setUser} />}
-        />
-
-        <Route
-          path="/products"
-          element={
-            <Products
-              addToCart={addToCart}
-              user={user}
-            />
-          }
-        />
-
-        <Route
-          path="/cart"
-          element={
-            <Cart
-              cart={cart}
-              setCart={setCart}
-              user={user}
-            />
-          }
-        />
-
-        <Route
-          path="*"
-          element={<Navigate to="/products" replace />}
-        />
-      </Routes>
-    </>
+    <ToastProvider>
+      <AuthProvider>
+        <CartProvider>
+          <AppContent />
+        </CartProvider>
+      </AuthProvider>
+    </ToastProvider>
   );
 }
 

@@ -81,7 +81,7 @@ const userSchema = new mongoose.Schema(
   }
 );
 
-// PRODUCT SCHEMA - Preserves existing fields and collection structure
+// PRODUCT SCHEMA - Beauty & Skincare luxury catalog
 const productSchema = new mongoose.Schema({
   productId: {
     type: String,
@@ -97,9 +97,26 @@ const productSchema = new mongoose.Schema({
     required: true,
     min: 0
   },
+  originalPrice: {
+    type: Number,
+    default: null
+  },
+  image: {
+    type: String,
+    default: ""
+  },
+  size: {
+    type: String,
+    default: "50 ml"
+  },
+  subtitle: {
+    type: String,
+    default: ""
+  },
   category: {
     type: String,
-    trim: true
+    trim: true,
+    default: "Skincare"
   },
   quantity: {
     type: Number,
@@ -108,7 +125,16 @@ const productSchema = new mongoose.Schema({
   },
   description: {
     type: String,
-    trim: true
+    trim: true,
+    default: ""
+  },
+  howToUse: {
+    type: String,
+    default: ""
+  },
+  ingredients: {
+    type: String,
+    default: ""
   }
 });
 
@@ -141,6 +167,37 @@ const orderSchema = new mongoose.Schema({
     default: Date.now
   }
 });
+
+// CART SCHEMA - Cloud-synchronized shopping cart
+const cartItemSchema = new mongoose.Schema(
+  {
+    productId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Product",
+      required: true
+    },
+    quantity: {
+      type: Number,
+      required: true,
+      min: [1, "Quantity must be at least 1"]
+    }
+  },
+  { _id: false }
+);
+
+const cartSchema = new mongoose.Schema(
+  {
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+      unique: true,
+      index: true
+    },
+    items: [cartItemSchema]
+  },
+  { timestamps: true }
+);
 
 // REFRESH TOKEN SCHEMA - Tracks rotation, expiry, revocation & reuse detection
 const refreshTokenSchema = new mongoose.Schema({
@@ -183,8 +240,9 @@ const refreshTokenSchema = new mongoose.Schema({
 const User = mongoose.models.User || mongoose.model("User", userSchema);
 const Product = mongoose.models.Product || mongoose.model("Product", productSchema);
 const Order = mongoose.models.Order || mongoose.model("Order", orderSchema);
+const Cart = mongoose.models.Cart || mongoose.model("Cart", cartSchema);
 const RefreshToken =
   mongoose.models.RefreshToken ||
   mongoose.model("RefreshToken", refreshTokenSchema);
 
-module.exports = { User, Product, Order, RefreshToken };
+module.exports = { User, Product, Order, Cart, RefreshToken };

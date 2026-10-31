@@ -14,7 +14,7 @@ const cors = require("cors");
 const cookieParser = require("cookie-parser");
 
 const config = require("./config/env");
-const { User, Product, Order } = require("./schema");
+const { User, Product, Order, Cart } = require("./schema");
 const {
   hashPassword,
   comparePassword,
@@ -299,6 +299,81 @@ async function getMeHandler(req, res, next) {
 app.get("/api/users/me", authenticate, getMeHandler);
 app.get("/api/auth/me", authenticate, getMeHandler);
 
+// UPDATE PROFILE (Username, Age)
+app.put("/api/users/me", authenticate, async (req, res, next) => {
+  try {
+    const { username, age } = req.body;
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (username !== undefined) {
+      const trimmed = String(username).trim();
+      if (trimmed.length < 2 || trimmed.length > 50) {
+        return res.status(400).json({ message: "Username must be between 2 and 50 characters" });
+      }
+      user.username = trimmed;
+    }
+
+    if (age !== undefined) {
+      const parsedAge = Number(age);
+      if (isNaN(parsedAge) || parsedAge < 1 || parsedAge > 120) {
+        return res.status(400).json({ message: "Age must be an integer between 1 and 120" });
+      }
+      user.age = parsedAge;
+    }
+
+    await user.save();
+
+    return res.json({
+      message: "Profile updated successfully",
+      user: {
+        userId: user._id,
+        username: user.username,
+        emailId: user.emailId,
+        age: user.age,
+        role: user.role,
+        emailVerified: user.emailVerified
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// CHANGE PASSWORD (Authenticated)
+app.post("/api/auth/change-password", authenticate, async (req, res, next) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ message: "Current password and new password are required" });
+    }
+
+    if (newPassword.length < 8) {
+      return res.status(400).json({ message: "New password must be at least 8 characters long" });
+    }
+
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const isMatch = await comparePassword(currentPassword, user.password);
+    if (!isMatch) {
+      return res.status(401).json({ message: "Incorrect current password" });
+    }
+
+    user.password = await hashPassword(newPassword);
+    await user.save();
+
+    return res.json({ message: "Password changed successfully" });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // 6. REQUEST PASSWORD RESET
 app.post(
   "/api/auth/request-password-reset",
@@ -409,11 +484,79 @@ app.post(
 // PRODUCT ENDPOINTS
 // -------------------------------------------------------------
 
-// GET ALL PRODUCTS (Public, preserves database collection and IDs)
-app.get("/api/products", async (_req, res, next) => {
+// GET ALL PRODUCTS (Public, with authoritative search, filter, sort & pagination)
+app.get("/api/products", async (req, res, next) => {
   try {
-    const products = await Product.find().select("-__v");
+    const { category, search, minPrice, maxPrice, sortBy, page, limit } = req.query;
+    const query = {};
+
+    if (category && category !== "All") {
+      query.category = { $regex: new RegExp(`^${category}$`, "i") };
+    }
+
+    if (search) {
+      const searchRegex = new RegExp(String(search).trim(), "i");
+      query.$or = [
+        { productName: searchRegex },
+        { description: searchRegex },
+        { subtitle: searchRegex },
+        { category: searchRegex }
+      ];
+    }
+
+    if (minPrice != null || maxPrice != null) {
+      query.productPrice = {};
+      if (minPrice != null && minPrice !== "" && !isNaN(Number(minPrice))) {
+        query.productPrice.$gte = Number(minPrice);
+      }
+      if (maxPrice != null && maxPrice !== "" && !isNaN(Number(maxPrice))) {
+        query.productPrice.$lte = Number(maxPrice);
+      }
+      if (Object.keys(query.productPrice).length === 0) {
+        delete query.productPrice;
+      }
+    }
+
+    let sortOption = { _id: -1 };
+    if (sortBy === "price-asc") sortOption = { productPrice: 1 };
+    else if (sortBy === "price-desc") sortOption = { productPrice: -1 };
+    else if (sortBy === "name-asc") sortOption = { productName: 1 };
+    else if (sortBy === "name-desc") sortOption = { productName: -1 };
+
+    // Authoritative Pagination if requested
+    if (page && limit) {
+      const pageNum = Math.max(1, parseInt(page, 10) || 1);
+      const limitNum = Math.max(1, parseInt(limit, 10) || 10);
+      const skip = (pageNum - 1) * limitNum;
+
+      const [products, total] = await Promise.all([
+        Product.find(query).sort(sortOption).skip(skip).limit(limitNum).select("-__v"),
+        Product.countDocuments(query)
+      ]);
+
+      return res.json({
+        products,
+        total,
+        page: pageNum,
+        totalPages: Math.ceil(total / limitNum)
+      });
+    }
+
+    const products = await Product.find(query).sort(sortOption).select("-__v");
     return res.json(products);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET PRODUCT BY ID (Authoritative product lookup)
+app.get("/api/products/:id", validate(objectIdParamValidation), async (req, res, next) => {
+  try {
+    const product = await Product.findById(req.params.id).select("-__v");
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+    return res.json(product);
   } catch (err) {
     next(err);
   }
@@ -426,8 +569,19 @@ app.post(
   requireAdmin,
   async (req, res, next) => {
     try {
-      const { productName, productPrice, category, quantity, description } =
-        req.body;
+      const {
+        productName,
+        productPrice,
+        originalPrice,
+        image,
+        size,
+        subtitle,
+        category,
+        quantity,
+        description,
+        howToUse,
+        ingredients
+      } = req.body;
 
       if (!productName || productPrice == null || quantity == null) {
         return res.status(400).json({
@@ -438,9 +592,15 @@ app.post(
       const product = await Product.create({
         productName: String(productName).trim(),
         productPrice: Number(productPrice),
-        category: category ? String(category).trim() : "General",
+        originalPrice: originalPrice != null ? Number(originalPrice) : null,
+        image: image ? String(image).trim() : "",
+        size: size ? String(size).trim() : "50 ml",
+        subtitle: subtitle ? String(subtitle).trim() : "",
+        category: category ? String(category).trim() : "Skincare",
         quantity: Number(quantity),
-        description: description ? String(description).trim() : ""
+        description: description ? String(description).trim() : "",
+        howToUse: howToUse ? String(howToUse).trim() : "",
+        ingredients: ingredients ? String(ingredients).trim() : ""
       });
 
       return res.status(201).json({
@@ -452,6 +612,218 @@ app.post(
     }
   }
 );
+
+// -------------------------------------------------------------
+// CART ENDPOINTS (Cloud-Synchronized across devices)
+// Authoritative prices and live stock are enforced!
+// -------------------------------------------------------------
+
+async function formatCartResponse(cartDoc) {
+  await cartDoc.populate("items.productId");
+
+  const validItems = [];
+  let itemsModified = false;
+
+  for (const item of cartDoc.items) {
+    const p = item.productId;
+    if (!p) {
+      itemsModified = true;
+      continue;
+    }
+
+    const availableStock = p.quantity != null ? p.quantity : 0;
+    let qty = item.quantity;
+    if (qty > availableStock && availableStock > 0) {
+      qty = availableStock;
+      itemsModified = true;
+    } else if (availableStock === 0) {
+      qty = 0;
+    }
+
+    validItems.push({
+      _id: p._id,
+      productId: p._id,
+      productName: p.productName,
+      subtitle: p.subtitle || "",
+      productPrice: p.productPrice,
+      originalPrice: p.originalPrice || null,
+      size: p.size || "50 ml",
+      category: p.category || "Skincare",
+      image: p.image || "",
+      quantity: availableStock,
+      cartQty: qty
+    });
+  }
+
+  // Clean out deleted or zero-stock products if adjusted
+  if (itemsModified) {
+    cartDoc.items = validItems
+      .filter((i) => i.cartQty > 0)
+      .map((i) => ({ productId: i.productId, quantity: i.cartQty }));
+    await cartDoc.save();
+  }
+
+  const itemsSubtotal = validItems.reduce(
+    (sum, item) => sum + item.productPrice * item.cartQty,
+    0
+  );
+  const totalItems = validItems.reduce((sum, item) => sum + item.cartQty, 0);
+
+  return {
+    items: validItems,
+    subtotal: itemsSubtotal,
+    totalItems
+  };
+}
+
+// 1. GET CART
+app.get("/api/cart", authenticate, async (req, res, next) => {
+  try {
+    let cart = await Cart.findOne({ userId: req.user._id });
+    if (!cart) {
+      cart = await Cart.create({ userId: req.user._id, items: [] });
+    }
+    const response = await formatCartResponse(cart);
+    return res.json(response);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// 2. ADD / MERGE ITEMS TO CART
+// Accepts single: { productId, quantity } or batch: { items: [{ productId, quantity }] }
+app.post("/api/cart/items", authenticate, async (req, res, next) => {
+  try {
+    let cart = await Cart.findOne({ userId: req.user._id });
+    if (!cart) {
+      cart = await Cart.create({ userId: req.user._id, items: [] });
+    }
+
+    const itemsToAdd = Array.isArray(req.body.items)
+      ? req.body.items
+      : [
+          {
+            productId: req.body.productId,
+            quantity: req.body.quantity || 1
+          }
+        ];
+
+    for (const item of itemsToAdd) {
+      if (!item.productId || !mongoose.Types.ObjectId.isValid(item.productId)) {
+        continue;
+      }
+
+      const product = await Product.findById(item.productId);
+      if (!product || product.quantity <= 0) continue;
+
+      const addQty = Math.max(1, parseInt(item.quantity, 10) || 1);
+      const existing = cart.items.find(
+        (i) => (i.productId?._id || i.productId).toString() === item.productId.toString()
+      );
+
+      if (existing) {
+        existing.quantity = Math.min(
+          product.quantity,
+          existing.quantity + addQty
+        );
+      } else {
+        cart.items.push({
+          productId: product._id,
+          quantity: Math.min(product.quantity, addQty)
+        });
+      }
+    }
+
+    await cart.save();
+    const response = await formatCartResponse(cart);
+    return res.json(response);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// 3. UPDATE ITEM QUANTITY IN CART
+app.put("/api/cart/items/:productId", authenticate, async (req, res, next) => {
+  try {
+    const { productId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(productId)) {
+      return res.status(400).json({ message: "Invalid product ID format" });
+    }
+    const targetQty = parseInt(req.body.quantity, 10);
+
+    let cart = await Cart.findOne({ userId: req.user._id });
+    if (!cart) {
+      cart = await Cart.create({ userId: req.user._id, items: [] });
+    }
+
+    if (isNaN(targetQty) || targetQty <= 0) {
+      cart.items = cart.items.filter(
+        (i) => (i.productId?._id || i.productId).toString() !== productId.toString()
+      );
+    } else {
+      const product = await Product.findById(productId);
+      if (!product) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+
+      const clampedQty = Math.min(product.quantity, targetQty);
+      const existing = cart.items.find(
+        (i) => (i.productId?._id || i.productId).toString() === productId.toString()
+      );
+
+      if (existing) {
+        existing.quantity = clampedQty;
+      } else {
+        cart.items.push({ productId: product._id, quantity: clampedQty });
+      }
+    }
+
+    await cart.save();
+    const response = await formatCartResponse(cart);
+    return res.json(response);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// 4. REMOVE ITEM FROM CART
+app.delete("/api/cart/items/:productId", authenticate, async (req, res, next) => {
+  try {
+    const { productId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(productId)) {
+      return res.status(400).json({ message: "Invalid product ID format" });
+    }
+    let cart = await Cart.findOne({ userId: req.user._id });
+
+    if (cart) {
+      cart.items = cart.items.filter(
+        (i) => (i.productId?._id || i.productId).toString() !== productId.toString()
+      );
+      await cart.save();
+    } else {
+      cart = await Cart.create({ userId: req.user._id, items: [] });
+    }
+
+    const response = await formatCartResponse(cart);
+    return res.json(response);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// 5. CLEAR ENTIRE CART
+app.delete("/api/cart", authenticate, async (req, res, next) => {
+  try {
+    let cart = await Cart.findOne({ userId: req.user._id });
+    if (cart) {
+      cart.items = [];
+      await cart.save();
+    }
+    return res.json({ items: [], subtotal: 0, totalItems: 0 });
+  } catch (err) {
+    next(err);
+  }
+});
 
 // -------------------------------------------------------------
 // ORDER ENDPOINTS
@@ -472,7 +844,11 @@ app.post(
       const authenticatedUserId = req.user._id;
 
       // If client supplied a userId that does not match authenticated user, reject attempt
-      if (sentUserId && sentUserId.toString() !== authenticatedUserId.toString() && req.user.role !== "admin") {
+      if (
+        sentUserId &&
+        sentUserId.toString() !== authenticatedUserId.toString() &&
+        req.user.role !== "admin"
+      ) {
         return res.status(403).json({
           message: "Access forbidden: cannot create orders for another user"
         });
@@ -549,6 +925,12 @@ app.post(
           });
         }
       }
+
+      // Synchronously empty user's cloud cart upon successful order
+      await Cart.findOneAndUpdate(
+        { userId: authenticatedUserId },
+        { $set: { items: [] } }
+      );
 
       return res.status(201).json({
         message: "Order placed successfully",
