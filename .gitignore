@@ -1,0 +1,31 @@
+# Environment configuration - NEVER COMMIT REAL SECRETS
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Dependencies
+node_modules/
+App/shopping-backend/node_modules/
+App/shopping-frontend/node_modules/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Test & coverage
+coverage/
+.nyc_output/
+
+# Build outputs
+dist/
+dist-ssr/
+*.local
+
+# Editor and OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
