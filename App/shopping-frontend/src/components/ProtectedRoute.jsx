@@ -21,9 +21,9 @@ function ProtectedRoute({ children, adminOnly = false }) {
     );
   }
 
-  // 401 Unauthorized handling: preserve attempted location and redirect to login
+  // 401 Unauthorized handling: preserve attempted location and redirect to appropriate login
   if (!isAuthenticated) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
+    return <Navigate to={adminOnly ? "/admin/login" : "/login"} state={{ from: location }} replace />;
   }
 
   // 403 Forbidden handling: explicitly inform user that administrative privileges are required
@@ -45,6 +45,11 @@ function ProtectedRoute({ children, adminOnly = false }) {
         </div>
       </div>
     );
+  }
+
+  // Administrators cannot access customer-only protected routes
+  if (!adminOnly && user?.role === "admin") {
+    return <Navigate to="/admin/dashboard" replace />;
   }
 
   return children;

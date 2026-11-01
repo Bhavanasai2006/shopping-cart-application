@@ -7,6 +7,7 @@ import { useAuth } from "../context/AuthContext";
 import { useCart } from "../context/CartContext";
 import { useToast } from "../context/ToastContext";
 import { sanitizeErrorMessage } from "../utils/security";
+import { formatINR } from "../utils/formatCurrency";
 
 function Cart() {
   const { user, authFetch } = useAuth();
@@ -17,7 +18,6 @@ function Cart() {
     clearCart,
     totals,
     authoritativeNotice,
-    isSyncing,
     verifyAuthoritativeData
   } = useCart();
   const { showToast } = useToast();
@@ -35,73 +35,26 @@ function Cart() {
     verifyAuthoritativeData();
   }, [verifyAuthoritativeData]);
 
-  async function checkout() {
+  function handleProceedToCheckout() {
     if (!user) {
-      navigate("/login", { state: { from: location } });
+      navigate("/login", { state: { from: { pathname: "/checkout" } } });
       return;
     }
 
     if (cart.length === 0) return;
 
-    setLoading(true);
-    setErrorMessage("");
-
-    try {
-      const isObjectId = (val) => /^[0-9a-fA-F]{24}$/.test(val);
-      const itemsPayload = cart
-        .filter((item) => isObjectId(item._id || item.productId))
-        .map((item) => ({
-          productId: item._id || item.productId,
-          quantity: item.cartQty
-        }));
-
-      if (itemsPayload.length === 0) {
-        await clearCart();
-        showToast({
-          type: "success",
-          message: "Order placed successfully! Thank you for choosing SOLE Skincare."
-        });
-        navigate("/products");
-        return;
-      }
-
-      const res = await authFetch(`${API_URL}/orders`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId: user.userId,
-          items: itemsPayload
-        })
-      });
-
-      const data = await res.json().catch(() => ({}));
-
-      if (!res.ok) {
-        if (res.status === 401) {
-          throw new Error("Session expired. Please log in again to complete your order.");
-        }
-        if (res.status === 403) {
-          throw new Error("Access forbidden: you do not have permission to place this order.");
-        }
-        throw new Error(data.message || "Checkout failed");
-      }
-
-      await clearCart();
-      showToast({
-        type: "success",
-        message: `Order #${data.orderId?.slice(-6).toUpperCase() || ""} placed successfully!`
-      });
-      navigate("/orders");
-    } catch (err) {
-      const safeErr = sanitizeErrorMessage(err, "An error occurred during checkout");
-      setErrorMessage(safeErr);
+    const hasUnavailable = cart.some(
+      (item) => item.isActive === false || (item.quantity != null && item.quantity <= 0)
+    );
+    if (hasUnavailable) {
       showToast({
         type: "error",
-        message: safeErr
+        message: "Please remove unavailable products from your cart before checkout."
       });
-    } finally {
-      setLoading(false);
+      return;
     }
+
+    navigate("/checkout");
   }
 
   function handleConfirmClearCart() {
@@ -134,7 +87,7 @@ function Cart() {
           ‹
         </Link>
         <h1 className="cart-header-title">
-          My cart {isSyncing && <span className="sync-indicator" aria-label="Syncing with cloud">↻</span>}
+          My cart
         </h1>
 
         <div className="cart-header-right-actions">
@@ -214,6 +167,11 @@ function Cart() {
                         <span className="cart-item-category">
                           {item.category || "Skincare"} • {item.size || "50 ml"}
                         </span>
+                        {(item.isActive === false || (item.quantity != null && item.quantity <= 0)) && (
+                          <span className="cart-item-unavailable-tag" style={{ display: "inline-block", color: "#C0392B", fontSize: "0.78rem", fontWeight: 600, marginTop: "4px" }}>
+                            ⚠️ Product currently unavailable
+                          </span>
+                        )}
                       </div>
 
                       <button
@@ -233,14 +191,14 @@ function Cart() {
                             className="cart-item-orig-price"
                             aria-label="Original price"
                           >
-                            ${Number(item.originalPrice).toFixed(2)}
+                            {formatINR(item.originalPrice)}
                           </span>
                         )}
                         <span
                           className="cart-item-curr-price"
                           aria-label="Current price"
                         >
-                          ${Number(item.productPrice || 0).toFixed(2)}
+                          {formatINR(item.productPrice)}
                         </span>
                       </div>
 
@@ -293,23 +251,23 @@ function Cart() {
             <div className="summary-line">
               <span>Delivery:</span>
               <span>
-                {totals.delivery === 0 ? "Free" : `$${totals.delivery.toFixed(2)}`}
+                {totals.delivery === 0 ? "Free" : formatINR(totals.delivery)}
               </span>
             </div>
 
             <div className="summary-line">
               <span>Discount:</span>
-              <span className="discount-green">-${totals.discount.toFixed(2)}</span>
+              <span className="discount-green">-{formatINR(totals.discount)}</span>
             </div>
 
             <div className="summary-line total-before">
               <span>Total:</span>
-              <span>${(totals.itemsSubtotal + totals.delivery).toFixed(2)}</span>
+              <span>{formatINR(totals.itemsSubtotal + totals.delivery)}</span>
             </div>
 
             <div className="summary-line subtotal-highlight">
               <span>Subtotal:</span>
-              <strong>${totals.grandTotal.toFixed(2)}</strong>
+              <strong>{formatINR(totals.grandTotal)}</strong>
             </div>
           </div>
 
@@ -323,31 +281,25 @@ function Cart() {
           <div className="cart-sticky-checkout-bar">
             <div className="checkout-price-info">
               <span className="checkout-struck-price" aria-label="Original subtotal">
-                ${(totals.itemsSubtotal + totals.delivery).toFixed(2)}
+                {formatINR(totals.itemsSubtotal + totals.delivery)}
               </span>
               <span className="checkout-final-price" aria-label="Final subtotal">
-                ${totals.grandTotal.toFixed(2)}
+                {formatINR(totals.grandTotal)}
               </span>
             </div>
 
             <button
               className="checkout-pill-btn"
-              onClick={checkout}
-              disabled={loading}
+              onClick={handleProceedToCheckout}
+              disabled={loading || cart.length === 0}
               aria-label={
-                loading
-                  ? "Processing order..."
-                  : `Proceed to checkout for $${totals.grandTotal.toFixed(2)}`
+                totals.grandTotal > 0
+                  ? `Proceed to checkout for ${formatINR(totals.grandTotal)}`
+                  : "Proceed to checkout"
               }
             >
-              {loading ? (
-                <span className="btn-spinner-wrap">
-                  <span className="btn-spinner" aria-hidden="true" />
-                  Processing...
-                </span>
-              ) : (
-                "Checkout"
-              )}
+              <span>Proceed to Checkout</span>
+              <span className="checkout-btn-arrow" aria-hidden="true">→</span>
             </button>
           </div>
         </div>

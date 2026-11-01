@@ -3,7 +3,9 @@ import { sanitizeImageUrl } from "../utils/security";
 
 function SkincareImage({ name = "", category = "", image = "", className = "" }) {
   const [imageError, setImageError] = useState(false);
-  const safeImage = sanitizeImageUrl(image);
+  // Auto-resolve catalog .svg paths to photorealistic .webp assets
+  const resolvedImage = image ? image.replace(/\.svg$/i, ".webp") : "";
+  const safeImage = sanitizeImageUrl(resolvedImage || image);
 
   // Determine bottle silhouette by category/name
   const isJar =

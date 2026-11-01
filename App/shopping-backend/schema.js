@@ -135,38 +135,149 @@ const productSchema = new mongoose.Schema({
   ingredients: {
     type: String,
     default: ""
+  },
+  isActive: {
+    type: Boolean,
+    default: true
   }
 });
 
-// ORDER SCHEMA
-const orderSchema = new mongoose.Schema({
-  userId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "User",
-    required: true
-  },
-  items: [
-    {
-      productId: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Product",
-        required: true
-      },
-      productName: String,
-      price: Number,
-      quantity: Number
+// ORDER ITEM SNAPSHOT SCHEMA - Immutable purchase-time record
+const orderItemSchema = new mongoose.Schema(
+  {
+    productId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Product",
+      required: true
+    },
+    productName: {
+      type: String,
+      required: true,
+      default: "Skincare Product"
+    },
+    image: {
+      type: String,
+      default: ""
+    },
+    price: {
+      type: Number,
+      required: true,
+      min: 0
+    },
+    quantity: {
+      type: Number,
+      required: true,
+      min: 1
+    },
+    lineTotal: {
+      type: Number,
+      required: true,
+      min: 0,
+      default: function () {
+        return (this.price || 0) * (this.quantity || 1);
+      }
     }
-  ],
-  totalAmount: {
-    type: Number,
-    required: true,
-    min: 0
   },
-  createdAt: {
-    type: Date,
-    default: Date.now
+  { _id: false }
+);
+
+// ORDER SHIPPING ADDRESS SCHEMA
+const shippingAddressSchema = new mongoose.Schema(
+  {
+    fullName: { type: String, required: true, trim: true },
+    phone: { type: String, required: true, trim: true },
+    addressLine1: { type: String, required: true, trim: true },
+    addressLine2: { type: String, trim: true, default: "" },
+    city: { type: String, required: true, trim: true },
+    state: { type: String, required: true, trim: true },
+    postalCode: { type: String, required: true, trim: true },
+    country: { type: String, trim: true, default: "United States" }
+  },
+  { _id: false }
+);
+
+// ORDER STATUS HISTORY SCHEMA - Audit log for status transitions
+const orderStatusHistorySchema = new mongoose.Schema(
+  {
+    status: {
+      type: String,
+      enum: ["placed", "processing", "shipped", "delivered", "cancelled"],
+      required: true
+    },
+    changedAt: {
+      type: Date,
+      default: Date.now
+    },
+    note: {
+      type: String,
+      default: ""
+    }
+  },
+  { _id: false }
+);
+
+// ORDER SCHEMA - Secure, transactional, lifecycle-enabled order record
+const orderSchema = new mongoose.Schema(
+  {
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+      index: true
+    },
+    items: [orderItemSchema],
+    totalAmount: {
+      type: Number,
+      required: true,
+      min: 0
+    },
+    status: {
+      type: String,
+      enum: ["placed", "processing", "shipped", "delivered", "cancelled"],
+      default: "placed",
+      index: true
+    },
+    statusHistory: {
+      type: [orderStatusHistorySchema],
+      default: function () {
+        return [
+          {
+            status: "placed",
+            changedAt: new Date(),
+            note: "Order created successfully"
+          }
+        ];
+      }
+    },
+    shippingAddress: {
+      type: shippingAddressSchema,
+      default: null
+    },
+    idempotencyKey: {
+      type: String,
+      sparse: true
+    },
+    idempotencyFingerprint: {
+      type: String,
+      sparse: true
+    },
+    cancelledAt: {
+      type: Date,
+      default: null
+    },
+    cancellationReason: {
+      type: String,
+      default: null
+    }
+  },
+  {
+    timestamps: true
   }
-});
+);
+
+// Compound index for scoped idempotency enforcement per customer
+orderSchema.index({ userId: 1, idempotencyKey: 1 }, { unique: true, sparse: true });
+orderSchema.index({ userId: 1, createdAt: -1 });
 
 // CART SCHEMA - Cloud-synchronized shopping cart
 const cartItemSchema = new mongoose.Schema(

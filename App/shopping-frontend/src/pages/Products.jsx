@@ -5,8 +5,9 @@ import ProductDetailModal from "../components/ProductDetailModal";
 import ProductSkeleton from "../components/ProductSkeleton";
 import { useCart } from "../context/CartContext";
 import { useToast } from "../context/ToastContext";
+import { formatINR } from "../utils/formatCurrency";
 
-const CATEGORIES = ["All", "Body Care", "Mask", "Cosmetic", "Serum", "Cleanser"];
+const CATEGORIES = ["All", "Cleansers", "Serums", "Moisturizers", "Sunscreens"];
 
 function Products() {
   const { addToCart, toggleWishlist, isInWishlist } = useCart();
@@ -265,20 +266,20 @@ function Products() {
 
             {/* Price Range Filter */}
             <div className="filter-group">
-              <label htmlFor="min-price-filter">Price Range ($)</label>
+              <label htmlFor="min-price-filter">Price Range (₹)</label>
               <div className="price-inputs-row">
                 <input
                   id="min-price-filter"
                   type="number"
                   min="0"
-                  placeholder="Min ($)"
+                  placeholder="Min (₹)"
                   value={minPrice}
                   onChange={(e) => {
                     setMinPrice(e.target.value);
                     setPage(1);
                   }}
                   className="price-filter-input"
-                  aria-label="Minimum price in dollars"
+                  aria-label="Minimum price in INR"
                 />
                 <span className="price-separator" aria-hidden="true">
                   –
@@ -287,14 +288,14 @@ function Products() {
                   id="max-price-filter"
                   type="number"
                   min="0"
-                  placeholder="Max ($)"
+                  placeholder="Max (₹)"
                   value={maxPrice}
                   onChange={(e) => {
                     setMaxPrice(e.target.value);
                     setPage(1);
                   }}
                   className="price-filter-input"
-                  aria-label="Maximum price in dollars"
+                  aria-label="Maximum price in INR"
                 />
               </div>
             </div>
@@ -387,11 +388,11 @@ function Products() {
                   <div className="sole-price-stack">
                     {product.originalPrice && (
                       <span className="sole-original-price">
-                        ${Number(product.originalPrice).toFixed(2)}
+                        {formatINR(product.originalPrice)}
                       </span>
                     )}
                     <span className="sole-current-price">
-                      ${Number(product.productPrice || 0).toFixed(2)}
+                      {formatINR(product.productPrice)}
                     </span>
                     {isOutOfStock && (
                       <span className="card-stock-warning">Out of stock</span>

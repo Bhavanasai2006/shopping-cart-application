@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" width="100%" height="100%">
+  
+    <defs>
+      <!-- Studio Lighting Background -->
+      <linearGradient id="bgGrad_hydrating_cleanser" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#F9F5F0" />
+        <stop offset="60%" stop-color="#F9F5F0" />
+        <stop offset="100%" stop-color="#E8DEC8" />
+      </linearGradient>
+
+      <!-- Radial Studio Ambient Light -->
+      <radialGradient id="studioLight_hydrating_cleanser" cx="50%" cy="30%" r="65%">
+        <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.75" />
+        <stop offset="50%" stop-color="#FFFFFF" stop-opacity="0.1" />
+        <stop offset="100%" stop-color="#000000" stop-opacity="0.04" />
+      </radialGradient>
+
+      <!-- Soft Ground Shadow -->
+      <radialGradient id="groundShadow_hydrating_cleanser" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" stop-color="#1A1816" stop-opacity="0.25" />
+        <stop offset="50%" stop-color="#1A1816" stop-opacity="0.10" />
+        <stop offset="100%" stop-color="#1A1816" stop-opacity="0" />
+      </radialGradient>
+
+      <!-- Packaging Body Gradient -->
+      <linearGradient id="bodyGrad_hydrating_cleanser" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="0%" stop-color="#DFD2BE" />
+        <stop offset="15%" stop-color="#F5EDE0" />
+        <stop offset="45%" stop-color="#FFFFFF" stop-opacity="0.6" />
+        <stop offset="70%" stop-color="#F5EDE0" />
+        <stop offset="100%" stop-color="#DFD2BE" />
+      </linearGradient>
+
+      <!-- Highlight Streak -->
+      <linearGradient id="highlightGrad_hydrating_cleanser" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0" />
+        <stop offset="50%" stop-color="#FFFFFF" stop-opacity="0.65" />
+        <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0" />
+      </linearGradient>
+
+      <!-- Metallic / Accent Gradient -->
+      <linearGradient id="metalGrad_hydrating_cleanser" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="0%" stop-color="#A68052" stop-opacity="0.8" />
+        <stop offset="35%" stop-color="#FFFFFF" stop-opacity="0.7" />
+        <stop offset="65%" stop-color="#A68052" />
+        <stop offset="100%" stop-color="#A68052" stop-opacity="0.6" />
+      </linearGradient>
+    </defs>
+  
+  <!-- Studio Background Canvas -->
+  <rect width="500" height="500" fill="url(#bgGrad_hydrating_cleanser)" />
+  <rect width="500" height="500" fill="url(#studioLight_hydrating_cleanser)" />
+
+  <!-- Subtle Studio Accent Glow -->
+  <circle cx="250" cy="270" r="180" fill="#A68052" opacity="0.08" />
+
+  <!-- Product Silhouette & Details -->
+  
+      <!-- Cylindrical Dispenser Silhouette -->
+      <!-- Ground Shadow -->
+      <ellipse cx="250" cy="445" rx="100" ry="20" fill="url(#groundShadow_hydrating_cleanser)" />
+
+      <!-- Bottle Body -->
+      <rect x="175" y="190" width="150" height="230" rx="14" fill="url(#bodyGrad_hydrating_cleanser)" />
+
+      <!-- Highlights -->
+      <rect x="187" y="202" width="9" height="206" rx="4.5" fill="url(#highlightGrad_hydrating_cleanser)" />
+      <rect x="306" y="202" width="6" height="206" rx="3" fill="#FFFFFF" opacity="0.25" />
+
+      <!-- Shoulder Collar -->
+      <path d="M 175 195 Q 175 180 220 170 L 280 170 Q 325 180 325 195 Z" fill="url(#bodyGrad_hydrating_cleanser)" />
+
+      <!-- Neck Screw Ring -->
+      <rect x="220" y="165" width="60" height="18" rx="2" fill="#C9AA82" />
+      <line x1="220" y1="171" x2="280" y2="171" stroke="#FFFFFF" stroke-width="1" opacity="0.5" />
+
+      <!-- Pump Head -->
+      <!-- Pump Stem -->
+      <rect x="242" y="135" width="16" height="32" rx="1" fill="#C9AA82" />
+      <!-- Pump Spout Top -->
+      <path d="M 215 120 L 275 120 Q 285 120 285 135 L 285 140 L 215 140 Q 195 135 195 127 Q 195 120 215 120 Z" fill="#C9AA82" />
+      <!-- Pump Spout Lip -->
+      <path d="M 195 127 Q 190 129 190 133 Q 195 135 205 135" fill="#555" opacity="0.3" />
+      <rect x="225" y="123" width="40" height="4" rx="2" fill="#FFFFFF" opacity="0.4" />
+
+      <!-- Minimalist Luxury Front Label -->
+      <g transform="translate(190, 220)">
+        <rect x="0" y="0" width="120" height="135" rx="3" fill="#FFFDF9" stroke="#A68052" stroke-width="0.6" />
+        <rect x="4" y="4" width="112" height="127" rx="2" fill="none" stroke="#A68052" stroke-width="0.4" stroke-dasharray="2,2" opacity="0.5" />
+
+        <!-- Brand -->
+        <text x="60" y="26" font-family="Georgia, 'Times New Roman', serif" font-size="14" font-weight="700" letter-spacing="4" fill="#241E19" text-anchor="middle">S O L E</text>
+        <line x1="44" y1="33" x2="76" y2="33" stroke="#A68052" stroke-width="0.8" />
+
+        <!-- Title -->
+        <text x="60" y="52" font-family="'Helvetica Neue', Arial, sans-serif" font-size="8" font-weight="700" letter-spacing="1.2" fill="#2B2620" text-anchor="middle">HYDRATING CLEANSER</text>
+        
+        <!-- Subtitle -->
+        <text x="60" y="68" font-family="'Helvetica Neue', Arial, sans-serif" font-size="6" font-weight="500" letter-spacing="0.7" fill="#A68052" text-anchor="middle">Comfort Daily Moisture Rinse</text>
+
+        <!-- Crest -->
+        <circle cx="60" cy="88" r="7" fill="none" stroke="#A68052" stroke-width="0.7" />
+        <circle cx="60" cy="88" r="3" fill="#A68052" opacity="0.5" />
+
+        <!-- Spec -->
+        <text x="60" y="112" font-family="'Helvetica Neue', Arial, sans-serif" font-size="6" letter-spacing="1" fill="#786F66" text-anchor="middle">200 ml • 6.7 fl. oz.</text>
+      </g>
+    
+</svg>

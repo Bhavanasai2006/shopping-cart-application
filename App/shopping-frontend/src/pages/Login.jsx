@@ -45,6 +45,10 @@ function Login() {
         type: "success",
         message: `Welcome back, ${loggedUser.username || "beauty enthusiast"}!`
       });
+      if (loggedUser.role === "admin") {
+        navigate("/admin/dashboard", { replace: true });
+        return;
+      }
       navigate(from, { replace: true });
     } catch (err) {
       setErrorMessage(sanitizeErrorMessage(err, "Invalid email or password"));

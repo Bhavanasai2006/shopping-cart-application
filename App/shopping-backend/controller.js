@@ -12,6 +12,7 @@ const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
+const crypto = require("node:crypto");
 
 const config = require("./config/env");
 const { User, Product, Order, Cart } = require("./schema");
@@ -53,7 +54,11 @@ const {
   requestPasswordResetValidation,
   resetPasswordValidation,
   verifyEmailValidation,
-  objectIdParamValidation
+  objectIdParamValidation,
+  createProductValidation,
+  updateProductValidation,
+  cancelOrderValidation,
+  updateOrderStatusValidation
 } = require("./middleware/validation");
 
 const { notFoundHandler, errorHandler } = require("./middleware/errorHandler");
@@ -488,7 +493,8 @@ app.post(
 app.get("/api/products", async (req, res, next) => {
   try {
     const { category, search, minPrice, maxPrice, sortBy, page, limit } = req.query;
-    const query = {};
+    // Exclude deactivated/archived products from public catalog
+    const query = { isActive: { $ne: false } };
 
     if (category && category !== "All") {
       query.category = { $regex: new RegExp(`^${category}$`, "i") };
@@ -553,7 +559,7 @@ app.get("/api/products", async (req, res, next) => {
 app.get("/api/products/:id", validate(objectIdParamValidation), async (req, res, next) => {
   try {
     const product = await Product.findById(req.params.id).select("-__v");
-    if (!product) {
+    if (!product || product.isActive === false) {
       return res.status(404).json({ message: "Product not found" });
     }
     return res.json(product);
@@ -562,55 +568,58 @@ app.get("/api/products/:id", validate(objectIdParamValidation), async (req, res,
   }
 });
 
-// CREATE PRODUCT (Admin only - RBAC protected)
+// Shared Admin Product Creation Logic
+async function createProductHandler(req, res, next) {
+  try {
+    const {
+      productName,
+      productPrice,
+      originalPrice,
+      image,
+      size,
+      subtitle,
+      category,
+      quantity,
+      description,
+      howToUse,
+      ingredients,
+      isActive
+    } = req.body;
+
+    const generatedId = new mongoose.Types.ObjectId();
+    const product = await Product.create({
+      _id: generatedId,
+      productId: req.body.productId ? String(req.body.productId).trim() : `prod_${generatedId}`,
+      productName: String(productName).trim(),
+      productPrice: Number(productPrice),
+      originalPrice: originalPrice != null ? Number(originalPrice) : null,
+      image: image ? String(image).trim() : "",
+      size: size ? String(size).trim() : "50 ml",
+      subtitle: subtitle ? String(subtitle).trim() : "",
+      category: category ? String(category).trim() : "Skincare",
+      quantity: Number(quantity),
+      description: description ? String(description).trim() : "",
+      howToUse: howToUse ? String(howToUse).trim() : "",
+      ingredients: ingredients ? String(ingredients).trim() : "",
+      isActive: isActive !== false
+    });
+
+    return res.status(201).json({
+      message: "Product created successfully",
+      product
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// CREATE PRODUCT (Legacy endpoint, admin-only & validated)
 app.post(
   "/api/products",
   authenticate,
   requireAdmin,
-  async (req, res, next) => {
-    try {
-      const {
-        productName,
-        productPrice,
-        originalPrice,
-        image,
-        size,
-        subtitle,
-        category,
-        quantity,
-        description,
-        howToUse,
-        ingredients
-      } = req.body;
-
-      if (!productName || productPrice == null || quantity == null) {
-        return res.status(400).json({
-          message: "Product name, price and quantity are required"
-        });
-      }
-
-      const product = await Product.create({
-        productName: String(productName).trim(),
-        productPrice: Number(productPrice),
-        originalPrice: originalPrice != null ? Number(originalPrice) : null,
-        image: image ? String(image).trim() : "",
-        size: size ? String(size).trim() : "50 ml",
-        subtitle: subtitle ? String(subtitle).trim() : "",
-        category: category ? String(category).trim() : "Skincare",
-        quantity: Number(quantity),
-        description: description ? String(description).trim() : "",
-        howToUse: howToUse ? String(howToUse).trim() : "",
-        ingredients: ingredients ? String(ingredients).trim() : ""
-      });
-
-      return res.status(201).json({
-        message: "Product created successfully",
-        product
-      });
-    } catch (err) {
-      next(err);
-    }
-  }
+  validate(createProductValidation),
+  createProductHandler
 );
 
 // -------------------------------------------------------------
@@ -631,13 +640,14 @@ async function formatCartResponse(cartDoc) {
       continue;
     }
 
-    const availableStock = p.quantity != null ? p.quantity : 0;
+    const isProductActive = p.isActive !== false;
+    const availableStock = isProductActive && p.quantity != null ? p.quantity : 0;
     let qty = item.quantity;
-    if (qty > availableStock && availableStock > 0) {
+    if (!isProductActive) {
+      qty = item.quantity;
+    } else if (qty > availableStock && availableStock > 0) {
       qty = availableStock;
       itemsModified = true;
-    } else if (availableStock === 0) {
-      qty = 0;
     }
 
     validItems.push({
@@ -651,14 +661,14 @@ async function formatCartResponse(cartDoc) {
       category: p.category || "Skincare",
       image: p.image || "",
       quantity: availableStock,
-      cartQty: qty
+      cartQty: qty,
+      isActive: isProductActive
     });
   }
 
-  // Clean out deleted or zero-stock products if adjusted
+  // Clean out deleted (null reference) products if adjusted
   if (itemsModified) {
     cartDoc.items = validItems
-      .filter((i) => i.cartQty > 0)
       .map((i) => ({ productId: i.productId, quantity: i.cartQty }));
     await cartDoc.save();
   }
@@ -829,21 +839,28 @@ app.delete("/api/cart", authenticate, async (req, res, next) => {
 // ORDER ENDPOINTS
 // -------------------------------------------------------------
 
-// PLACE ORDER / CHECKOUT
-// Protected API - Never trusts userId from request body!
+// PLACE ORDER / CHECKOUT (Secure, Transactional, Idempotent)
+// Protected API - Never trusts client-supplied prices, totals, or userId!
 app.post(
   "/api/orders",
   authenticate,
   validate(orderValidation),
   async (req, res, next) => {
     try {
-      const { items, userId: sentUserId } = req.body;
+      const { items, userId: sentUserId, shippingAddress } = req.body;
+
+      // Extract client-generated idempotency key from headers or request body
+      const rawKey =
+        req.headers["idempotency-key"] ||
+        req.headers["x-idempotency-key"] ||
+        req.body.idempotencyKey;
+      const idempotencyKey = rawKey ? String(rawKey).trim() : null;
 
       // ENFORCE OBJECT LEVEL AUTHORIZATION:
       // Always bind the order to the authenticated user ID (req.user._id).
       const authenticatedUserId = req.user._id;
 
-      // If client supplied a userId that does not match authenticated user, reject attempt
+      // Reject attempt if client explicitly supplied a mismatched userId (unless admin)
       if (
         sentUserId &&
         sentUserId.toString() !== authenticatedUserId.toString() &&
@@ -859,27 +876,79 @@ app.post(
         return res.status(404).json({ message: "User not found" });
       }
 
-      // Check for duplicate products in cart
-      const productIds = new Set();
+      // Safe normalization and aggregation of items by productId
+      // Consolidates duplicate product line items and prevents quantity overflow
+      const aggregatedMap = new Map();
       for (const item of items) {
         const pId = String(item.productId);
-        if (productIds.has(pId)) {
+        const existing = aggregatedMap.get(pId) || 0;
+        const newQty = existing + Number(item.quantity);
+        if (newQty > 99) {
           return res.status(400).json({
-            message: "Duplicate products in cart"
+            message: "Quantity for product exceeds maximum allowed limit of 99 units"
           });
         }
-        productIds.add(pId);
+        aggregatedMap.set(pId, newQty);
       }
 
-      // Fetch actual product prices from database & verify stock
+      const normalizedItems = Array.from(aggregatedMap.entries()).map(
+        ([productId, quantity]) => ({
+          productId,
+          quantity
+        })
+      );
+
+      // Compute request fingerprint for payload verification
+      const fingerprintPayload = {
+        items: normalizedItems,
+        shippingAddress: shippingAddress || null
+      };
+      const idempotencyFingerprint = crypto
+        .createHash("sha256")
+        .update(JSON.stringify(fingerprintPayload))
+        .digest("hex");
+
+      // Check Idempotency: Return existing order if identical request retried
+      if (idempotencyKey) {
+        const existingOrder = await Order.findOne({
+          userId: authenticatedUserId,
+          idempotencyKey
+        });
+
+        if (existingOrder) {
+          if (existingOrder.idempotencyFingerprint === idempotencyFingerprint) {
+            return res.status(200).json({
+              message: "Order placed successfully",
+              orderId: existingOrder._id,
+              totalAmount: existingOrder.totalAmount,
+              status: existingOrder.status,
+              isIdempotentReplay: true,
+              order: existingOrder
+            });
+          } else {
+            return res.status(409).json({
+              message:
+                "Idempotency key was previously used with a different order payload."
+            });
+          }
+        }
+      }
+
+      // Fetch actual product prices from database & verify availability and stock
       const orderItems = [];
       let totalAmount = 0;
 
-      for (const item of items) {
+      for (const item of normalizedItems) {
         const product = await Product.findById(item.productId);
         if (!product) {
           return res.status(404).json({
             message: "Product not found"
+          });
+        }
+
+        if (product.isActive === false) {
+          return res.status(400).json({
+            message: `Product "${product.productName}" is currently deactivated or unavailable.`
           });
         }
 
@@ -889,54 +958,146 @@ app.post(
           });
         }
 
+        const price = Number(product.productPrice);
+        const lineTotal = price * item.quantity;
+
+        // Snapshot purchase-time immutable product data
         orderItems.push({
           productId: product._id,
           productName: product.productName,
+          image: product.image || "",
+          price,
           quantity: item.quantity,
-          price: product.productPrice
+          lineTotal
         });
 
-        totalAmount += product.productPrice * item.quantity;
+        totalAmount += lineTotal;
       }
 
-      // Create order tied to verified identity
-      const order = await Order.create({
-        userId: authenticatedUserId,
-        items: orderItems,
-        totalAmount
-      });
+      // Validate calculated numeric bounds
+      if (totalAmount <= 0 || !Number.isFinite(totalAmount)) {
+        return res.status(400).json({
+          message: "Invalid total calculation"
+        });
+      }
 
-      // Reduce inventory atomically
-      for (const item of items) {
-        const updated = await Product.updateOne(
-          {
-            _id: item.productId,
-            quantity: { $gte: item.quantity }
-          },
-          {
-            $inc: { quantity: -item.quantity }
+      // ATOMIC INVENTORY & ORDER MANAGEMENT:
+      // Uses Mongoose session and multi-document transaction to guarantee all-or-nothing execution.
+      const session = await mongoose.startSession();
+      try {
+        session.startTransaction();
+
+        // 1. Conditionally deduct inventory for every item
+        for (const item of orderItems) {
+          const updateResult = await Product.updateOne(
+            {
+              _id: item.productId,
+              quantity: { $gte: item.quantity },
+              isActive: { $ne: false }
+            },
+            {
+              $inc: { quantity: -item.quantity }
+            },
+            { session }
+          );
+
+          if (updateResult.modifiedCount !== 1) {
+            await session.abortTransaction();
+            session.endSession();
+            return res.status(409).json({
+              message: "Stock changed. Please try checkout again."
+            });
           }
+        }
+
+        // 2. Persist order with immutable snapshots, shipping address & idempotency key
+        const [order] = await Order.create(
+          [
+            {
+              userId: authenticatedUserId,
+              items: orderItems,
+              totalAmount,
+              status: "placed",
+              statusHistory: [
+                {
+                  status: "placed",
+                  changedAt: new Date(),
+                  note: "Order placed successfully by customer"
+                }
+              ],
+              shippingAddress: shippingAddress || null,
+              idempotencyKey: idempotencyKey || null,
+              idempotencyFingerprint: idempotencyKey
+                ? idempotencyFingerprint
+                : null
+            }
+          ],
+          { session }
         );
 
-        if (updated.modifiedCount !== 1) {
-          await Order.findByIdAndDelete(order._id);
+        // 3. Commit the multi-document transaction atomically
+        await session.commitTransaction();
+        session.endSession();
+
+        // 4. Cart Consistency: Remove purchased items from cloud cart post-commit
+        try {
+          const purchasedProductIds = new Set(
+            orderItems.map((i) => i.productId.toString())
+          );
+          const userCart = await Cart.findOne({ userId: authenticatedUserId });
+          if (userCart && Array.isArray(userCart.items)) {
+            userCart.items = userCart.items.filter(
+              (ci) =>
+                !purchasedProductIds.has(
+                  (ci.productId?._id || ci.productId).toString()
+                )
+            );
+            await userCart.save();
+          }
+        } catch (cartErr) {
+          console.error("Cart synchronization notice after order commit:", cartErr);
+        }
+
+        return res.status(201).json({
+          message: "Order placed successfully",
+          orderId: order._id,
+          totalAmount,
+          status: order.status,
+          order
+        });
+      } catch (txnError) {
+        if (session.inTransaction()) {
+          await session.abortTransaction();
+        }
+        session.endSession();
+
+        // Handle concurrent duplicate request race on compound unique index
+        if (txnError.code === 11000 && idempotencyKey) {
+          const winningOrder = await Order.findOne({
+            userId: authenticatedUserId,
+            idempotencyKey
+          });
+          if (
+            winningOrder &&
+            winningOrder.idempotencyFingerprint === idempotencyFingerprint
+          ) {
+            return res.status(200).json({
+              message: "Order placed successfully",
+              orderId: winningOrder._id,
+              totalAmount: winningOrder.totalAmount,
+              status: winningOrder.status,
+              isIdempotentReplay: true,
+              order: winningOrder
+            });
+          }
           return res.status(409).json({
-            message: "Stock changed. Please try checkout again."
+            message:
+              "Idempotency key was previously used with a different order payload."
           });
         }
+
+        throw txnError;
       }
-
-      // Synchronously empty user's cloud cart upon successful order
-      await Cart.findOneAndUpdate(
-        { userId: authenticatedUserId },
-        { $set: { items: [] } }
-      );
-
-      return res.status(201).json({
-        message: "Order placed successfully",
-        orderId: order._id,
-        totalAmount
-      });
     } catch (err) {
       next(err);
     }
@@ -989,6 +1150,102 @@ app.get(
   }
 );
 
+// CANCEL ORDER & RESTORE INVENTORY ATOMICALLY
+// Customer order cancellation endpoint: checks ownership and eligibility, restores inventory atomically
+app.put(
+  "/api/orders/:id/cancel",
+  authenticate,
+  validate(objectIdParamValidation),
+  validate(cancelOrderValidation),
+  async (req, res, next) => {
+    try {
+      const order = await Order.findById(req.params.id);
+      if (!order) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+
+      // Check Ownership: customer can only cancel their own order; admin can cancel any
+      if (
+        req.user.role !== "admin" &&
+        order.userId.toString() !== req.user._id.toString()
+      ) {
+        return res.status(403).json({
+          message: "Access forbidden: you do not have permission to cancel this order"
+        });
+      }
+
+      // Check cancellation eligibility
+      if (order.status === "cancelled") {
+        return res.status(400).json({
+          message: "Order is already cancelled"
+        });
+      }
+
+      if (order.status === "shipped" || order.status === "delivered") {
+        return res.status(400).json({
+          message: `Orders with status '${order.status}' cannot be cancelled.`
+        });
+      }
+
+      if (order.status !== "placed" && order.status !== "processing") {
+        return res.status(400).json({
+          message: `Order cannot be cancelled in its current state (${order.status}).`
+        });
+      }
+
+      const cancellationReason =
+        req.body?.reason?.trim() ||
+        (req.user.role === "admin"
+          ? "Cancelled by administrator"
+          : "Cancelled by customer");
+
+      // Atomically restore inventory and update order status in a transaction
+      const session = await mongoose.startSession();
+      try {
+        session.startTransaction();
+
+        // Restock inventory for each order item
+        for (const item of order.items) {
+          await Product.updateOne(
+            { _id: item.productId },
+            { $inc: { quantity: item.quantity } },
+            { session }
+          );
+        }
+
+        order.status = "cancelled";
+        order.cancelledAt = new Date();
+        order.cancellationReason = cancellationReason;
+        order.statusHistory.push({
+          status: "cancelled",
+          changedAt: new Date(),
+          note: cancellationReason
+        });
+
+        await order.save({ session });
+
+        await session.commitTransaction();
+        session.endSession();
+
+        return res.json({
+          message: "Order cancelled successfully and inventory restored",
+          orderId: order._id,
+          status: order.status,
+          order
+        });
+      } catch (txnErr) {
+        if (session.inTransaction()) {
+          await session.abortTransaction();
+        }
+        session.endSession();
+        throw txnErr;
+      }
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
 // -------------------------------------------------------------
 // ADMIN ENDPOINTS (RBAC)
 // -------------------------------------------------------------
@@ -996,6 +1253,393 @@ app.get("/api/admin/users", authenticate, requireAdmin, async (_req, res, next) 
   try {
     const users = await User.find().select("-password -__v");
     return res.json(users);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// 1. ADMIN PRODUCTS LISTING (Full catalog including active/inactive status and metrics)
+app.get("/api/admin/products", authenticate, requireAdmin, async (req, res, next) => {
+  try {
+    const { category, search, status, sortBy, page, limit } = req.query;
+    const query = {};
+
+    if (category && category !== "All") {
+      query.category = { $regex: new RegExp(`^${category}$`, "i") };
+    }
+
+    if (status === "active") {
+      query.isActive = { $ne: false };
+    } else if (status === "inactive") {
+      query.isActive = false;
+    }
+
+    if (search) {
+      const searchRegex = new RegExp(String(search).trim(), "i");
+      query.$or = [
+        { productName: searchRegex },
+        { description: searchRegex },
+        { subtitle: searchRegex },
+        { category: searchRegex }
+      ];
+    }
+
+    let sortOption = { _id: -1 };
+    if (sortBy === "price-asc") sortOption = { productPrice: 1 };
+    else if (sortBy === "price-desc") sortOption = { productPrice: -1 };
+    else if (sortBy === "name-asc") sortOption = { productName: 1 };
+    else if (sortBy === "name-desc") sortOption = { productName: -1 };
+    else if (sortBy === "stock-asc") sortOption = { quantity: 1 };
+    else if (sortBy === "stock-desc") sortOption = { quantity: -1 };
+
+    const [totalAll, totalActive, totalInactive, totalLowStock, totalOutOfStock] = await Promise.all([
+      Product.countDocuments({}),
+      Product.countDocuments({ isActive: { $ne: false } }),
+      Product.countDocuments({ isActive: false }),
+      Product.countDocuments({ quantity: { $gt: 0, $lte: 5 } }),
+      Product.countDocuments({ quantity: 0 })
+    ]);
+
+    if (page && limit) {
+      const pageNum = Math.max(1, parseInt(page, 10) || 1);
+      const limitNum = Math.max(1, parseInt(limit, 10) || 10);
+      const skip = (pageNum - 1) * limitNum;
+
+      const [products, filteredTotal] = await Promise.all([
+        Product.find(query).sort(sortOption).skip(skip).limit(limitNum).select("-__v"),
+        Product.countDocuments(query)
+      ]);
+
+      return res.json({
+        products,
+        total: filteredTotal,
+        totalAll,
+        totalActive,
+        totalInactive,
+        totalLowStock,
+        totalOutOfStock,
+        page: pageNum,
+        totalPages: Math.ceil(filteredTotal / limitNum)
+      });
+    }
+
+    const products = await Product.find(query).sort(sortOption).select("-__v");
+    return res.json({
+      products,
+      total: products.length,
+      totalAll,
+      totalActive,
+      totalInactive,
+      totalLowStock,
+      totalOutOfStock
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// 2. ADMIN CREATE PRODUCT
+app.post(
+  "/api/admin/products",
+  authenticate,
+  requireAdmin,
+  validate(createProductValidation),
+  createProductHandler
+);
+
+// 3. ADMIN GET PRODUCT BY ID (Includes inactive products)
+app.get(
+  "/api/admin/products/:id",
+  authenticate,
+  requireAdmin,
+  validate(objectIdParamValidation),
+  async (req, res, next) => {
+    try {
+      const product = await Product.findById(req.params.id).select("-__v");
+      if (!product) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+      return res.json(product);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// 4. ADMIN UPDATE PRODUCT (Allowlisted fields with mass-assignment protection)
+app.patch(
+  "/api/admin/products/:id",
+  authenticate,
+  requireAdmin,
+  validate(updateProductValidation),
+  async (req, res, next) => {
+    try {
+      const product = await Product.findById(req.params.id);
+      if (!product) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+
+      const allowedFields = [
+        "productName",
+        "subtitle",
+        "productPrice",
+        "originalPrice",
+        "category",
+        "size",
+        "quantity",
+        "description",
+        "howToUse",
+        "ingredients",
+        "image",
+        "isActive"
+      ];
+
+      for (const field of allowedFields) {
+        if (req.body[field] !== undefined) {
+          if (field === "productPrice" || field === "quantity") {
+            product[field] = Number(req.body[field]);
+          } else if (field === "originalPrice") {
+            product[field] = req.body[field] != null ? Number(req.body[field]) : null;
+          } else if (typeof req.body[field] === "string") {
+            product[field] = req.body[field].trim();
+          } else {
+            product[field] = req.body[field];
+          }
+        }
+      }
+
+      await product.save();
+
+      return res.json({
+        message: "Product updated successfully",
+        product
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// 5. ADMIN DEACTIVATE / SOFT-DELETE PRODUCT (Preserves order and cart history)
+app.delete(
+  "/api/admin/products/:id",
+  authenticate,
+  requireAdmin,
+  validate(objectIdParamValidation),
+  async (req, res, next) => {
+    try {
+      const product = await Product.findById(req.params.id);
+      if (!product) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+
+      // If permanent delete is explicitly requested, prevent breaking existing orders
+      if (req.query.permanent === "true") {
+        const orderUsingProduct = await Order.findOne({ "items.productId": product._id });
+        if (orderUsingProduct) {
+          product.isActive = false;
+          await product.save();
+          return res.status(409).json({
+            message:
+              "Cannot permanently delete product referenced in customer order history. Product safely deactivated instead.",
+            product
+          });
+        }
+        await Product.findByIdAndDelete(product._id);
+        return res.json({
+          message: "Product permanently removed from database",
+          productId: product._id
+        });
+      }
+
+      // Safe deactivation
+      product.isActive = false;
+      await product.save();
+
+      return res.json({
+        message: "Product deactivated successfully",
+        product
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// 6. ADMIN REACTIVATE PRODUCT
+app.post(
+  "/api/admin/products/:id/reactivate",
+  authenticate,
+  requireAdmin,
+  validate(objectIdParamValidation),
+  async (req, res, next) => {
+    try {
+      const product = await Product.findById(req.params.id);
+      if (!product) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+
+      product.isActive = true;
+      await product.save();
+
+      return res.json({
+        message: "Product reactivated successfully",
+        product
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// 7. ADMIN ORDERS OVERVIEW
+app.get("/api/admin/orders", authenticate, requireAdmin, async (_req, res, next) => {
+  try {
+    const orders = await Order.find()
+      .populate("userId", "username emailId role")
+      .sort({ createdAt: -1 });
+    return res.json(orders);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ADMIN ORDER STATUS LIFECYCLE MANAGEMENT
+app.patch(
+  "/api/admin/orders/:id/status",
+  authenticate,
+  requireAdmin,
+  validate(objectIdParamValidation),
+  validate(updateOrderStatusValidation),
+  async (req, res, next) => {
+    try {
+      const order = await Order.findById(req.params.id);
+      if (!order) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+
+      const { status: newStatus, note } = req.body;
+      const currentStatus = order.status || "placed";
+
+      if (currentStatus === newStatus) {
+        return res.json({
+          message: `Order is already in status '${newStatus}'`,
+          order
+        });
+      }
+
+      // Valid status transition state machine
+      const allowedTransitions = {
+        placed: ["processing", "cancelled"],
+        processing: ["shipped", "cancelled"],
+        shipped: ["delivered"],
+        delivered: [],
+        cancelled: []
+      };
+
+      if (!allowedTransitions[currentStatus]?.includes(newStatus)) {
+        return res.status(400).json({
+          message: `Invalid status transition from '${currentStatus}' to '${newStatus}'.`
+        });
+      }
+
+      // If transitioning to cancelled, restore inventory atomically
+      if (newStatus === "cancelled") {
+        const session = await mongoose.startSession();
+        try {
+          session.startTransaction();
+
+          for (const item of order.items) {
+            await Product.updateOne(
+              { _id: item.productId },
+              { $inc: { quantity: item.quantity } },
+              { session }
+            );
+          }
+
+          order.status = "cancelled";
+          order.cancelledAt = new Date();
+          order.cancellationReason = note || "Cancelled by administrator";
+          order.statusHistory.push({
+            status: "cancelled",
+            changedAt: new Date(),
+            note: note || "Status updated by administrator"
+          });
+
+          await order.save({ session });
+          await session.commitTransaction();
+          session.endSession();
+
+          return res.json({
+            message: "Order cancelled and inventory restored",
+            order
+          });
+        } catch (txnErr) {
+          if (session.inTransaction()) {
+            await session.abortTransaction();
+          }
+          session.endSession();
+          throw txnErr;
+        }
+      }
+
+      // Forward lifecycle transition (processing, shipped, delivered)
+      order.status = newStatus;
+      order.statusHistory.push({
+        status: newStatus,
+        changedAt: new Date(),
+        note: note || `Status updated to ${newStatus} by administrator`
+      });
+
+      await order.save();
+
+      return res.json({
+        message: `Order status updated to '${newStatus}'`,
+        order
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// 8. ADMIN DASHBOARD STATS
+app.get("/api/admin/stats", authenticate, requireAdmin, async (_req, res, next) => {
+  try {
+    const [
+      totalProducts,
+      activeProducts,
+      inactiveProducts,
+      lowStockProducts,
+      outOfStockProducts,
+      totalOrders,
+      totalUsers,
+      allOrders
+    ] = await Promise.all([
+      Product.countDocuments({}),
+      Product.countDocuments({ isActive: { $ne: false } }),
+      Product.countDocuments({ isActive: false }),
+      Product.countDocuments({ quantity: { $gt: 0, $lte: 5 } }),
+      Product.countDocuments({ quantity: 0 }),
+      Order.countDocuments({}),
+      User.countDocuments({ role: "customer" }),
+      Order.find({}).select("totalAmount")
+    ]);
+
+    const totalRevenue = allOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+
+    return res.json({
+      stats: {
+        totalProducts,
+        activeProducts,
+        inactiveProducts,
+        lowStockProducts,
+        outOfStockProducts,
+        totalOrders,
+        totalUsers,
+        totalRevenue: Math.round(totalRevenue * 100) / 100
+      }
+    });
   } catch (err) {
     next(err);
   }

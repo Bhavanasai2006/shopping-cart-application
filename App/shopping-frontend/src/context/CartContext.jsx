@@ -1,21 +1,24 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import API_URL from "../api";
 import { useAuth } from "./AuthContext";
+import {
+  loadScopedWishlist,
+  saveScopedWishlist,
+  GUEST_CART_KEY
+} from "../utils/customerStorage";
 
 const CartContext = createContext(null);
 
-const CART_STORAGE_KEY = "sole_cart_v2";
-const WISHLIST_STORAGE_KEY = "sole_wishlist_v1";
-
 export function CartProvider({ children }) {
-  const { isAuthenticated, authFetch, loading: authLoading } = useAuth();
+  const { user, isAuthenticated, authFetch, loading: authLoading } = useAuth();
+  const isAdmin = isAuthenticated && user?.role === "admin";
 
   // -------------------------------------------------------------
-  // Cart & Wishlist State
+  // Cart & Wishlist State (Scoped & Isolated)
   // -------------------------------------------------------------
   const [cart, setCart] = useState(() => {
     try {
-      const saved = localStorage.getItem(CART_STORAGE_KEY);
+      const saved = localStorage.getItem(GUEST_CART_KEY);
       return saved ? JSON.parse(saved) : [];
     } catch {
       return [];
@@ -23,52 +26,79 @@ export function CartProvider({ children }) {
   });
 
   const [wishlist, setWishlist] = useState(() => {
-    try {
-      const saved = localStorage.getItem(WISHLIST_STORAGE_KEY);
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
+    return loadScopedWishlist(null);
   });
 
   const [authoritativeNotice, setAuthoritativeNotice] = useState("");
   const [isSyncing, setIsSyncing] = useState(false);
   const prevAuthRef = useRef(isAuthenticated);
+  const prevUserRef = useRef(user);
+  const isSyncingRef = useRef(false);
+  const cartRef = useRef(cart);
+
+  useEffect(() => {
+    cartRef.current = cart;
+  }, [cart]);
+
+  // -------------------------------------------------------------
+  // Account Identity Switching & Scoped Data Hydration
+  // -------------------------------------------------------------
+  useEffect(() => {
+    const prev = prevUserRef.current;
+    const currentUid = user?.userId || user?._id || user?.emailId;
+    const prevUid = prev?.userId || prev?._id || prev?.emailId;
+    const roleChanged = user?.role !== prev?.role;
+
+    if (currentUid !== prevUid || roleChanged) {
+      if (user?.role === "admin") {
+        // Administrators must NEVER inherit or hold customer wishlist or cart
+        setCart([]);
+        setWishlist([]);
+      } else if (user && user.role !== "admin") {
+        // Authenticated customer: hydrate their identity-scoped wishlist
+        setWishlist(loadScopedWishlist(user));
+      } else {
+        // Guest / unauthenticated: restore guest-scoped wishlist
+        setWishlist(loadScopedWishlist(null));
+      }
+    }
+
+    prevUserRef.current = user;
+  }, [user]);
 
   // -------------------------------------------------------------
   // Persist guest cart to localStorage when unauthenticated
   // -------------------------------------------------------------
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (!isAuthenticated && !isAdmin) {
       try {
-        localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
+        localStorage.setItem(GUEST_CART_KEY, JSON.stringify(cart));
       } catch {
         // Fallback for storage quota
       }
     }
-  }, [cart, isAuthenticated]);
+  }, [cart, isAuthenticated, isAdmin]);
 
-  // Persist Wishlist to localStorage
+  // Persist Wishlist to identity-scoped storage
   useEffect(() => {
-    try {
-      localStorage.setItem(WISHLIST_STORAGE_KEY, JSON.stringify(wishlist));
-    } catch {
-      // Fallback
+    if (!isAdmin) {
+      saveScopedWishlist(user, wishlist);
     }
-  }, [wishlist]);
+  }, [wishlist, user, isAdmin]);
 
   // -------------------------------------------------------------
-  // Cloud Cart Syncing (Authenticated)
+  // Cloud Cart Syncing (Authenticated Customers ONLY)
   // -------------------------------------------------------------
   const syncCloudCart = useCallback(async () => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated || isAdmin || isSyncingRef.current) return;
 
+    isSyncingRef.current = true;
     setIsSyncing(true);
     try {
       // Check if guest cart has items to merge on login
       let guestItems = [];
       try {
-        const saved = localStorage.getItem(CART_STORAGE_KEY);
+        const saved = localStorage.getItem(GUEST_CART_KEY);
         guestItems = saved ? JSON.parse(saved) : [];
       } catch {
         guestItems = [];
@@ -93,8 +123,11 @@ export function CartProvider({ children }) {
           const mergeData = await mergeRes.json();
           setCart(mergeData.items || []);
           // Clear guest items after successful merge
-          localStorage.removeItem(CART_STORAGE_KEY);
+          localStorage.removeItem(GUEST_CART_KEY);
           return;
+        } else {
+          // If merge failed, clear local guest items to prevent persistent retry failure
+          localStorage.removeItem(GUEST_CART_KEY);
         }
       }
 
@@ -107,16 +140,18 @@ export function CartProvider({ children }) {
     } catch {
       // Non-fatal sync fallback; prevent sensitive error logging
     } finally {
+      isSyncingRef.current = false;
       setIsSyncing(false);
     }
-  }, [isAuthenticated, authFetch]);
+  }, [isAuthenticated, isAdmin, authFetch]);
 
   // Sync on authentication change & listen to global logout events
   useEffect(() => {
     function handleLogout() {
       setCart([]);
+      setWishlist([]);
       try {
-        localStorage.removeItem(CART_STORAGE_KEY);
+        localStorage.removeItem(GUEST_CART_KEY);
       } catch {
         // Safe fallback
       }
@@ -128,11 +163,12 @@ export function CartProvider({ children }) {
 
     if (authLoading) return;
 
-    if (isAuthenticated) {
+    if (isAuthenticated && !isAdmin) {
       syncCloudCart();
     } else if (prevAuthRef.current && !isAuthenticated) {
       // User logged out: restore clean guest cart state
       setCart([]);
+      setWishlist([]);
     }
 
     prevAuthRef.current = isAuthenticated;
@@ -142,18 +178,21 @@ export function CartProvider({ children }) {
         window.removeEventListener("sole:logout", handleLogout);
       }
     };
-  }, [isAuthenticated, authLoading, syncCloudCart]);
+  }, [isAuthenticated, isAdmin, authLoading, syncCloudCart]);
 
   // -------------------------------------------------------------
   // Authoritative Price & Stock Verification (Public fallback)
   // -------------------------------------------------------------
   const verifyAuthoritativeData = useCallback(async () => {
+    if (isAdmin) return;
+
     if (isAuthenticated) {
       await syncCloudCart();
       return;
     }
 
-    if (cart.length === 0) return;
+    const currentCart = cartRef.current;
+    if (!currentCart || currentCart.length === 0) return;
 
     try {
       const res = await fetch(`${API_URL}/products`);
@@ -166,9 +205,18 @@ export function CartProvider({ children }) {
       const liveMap = new Map(liveProducts.map((p) => [String(p._id), p]));
       let adjusted = false;
 
-      const verifiedCart = cart.map((item) => {
+      const verifiedCart = currentCart.map((item) => {
         const live = liveMap.get(String(item._id || item.productId));
-        if (!live) return item;
+        if (!live) {
+          if (item.isActive !== false) {
+            adjusted = true;
+          }
+          return {
+            ...item,
+            isActive: false,
+            quantity: 0
+          };
+        }
 
         const maxStock = live.quantity != null ? live.quantity : item.quantity;
         const validPrice =
@@ -180,33 +228,44 @@ export function CartProvider({ children }) {
           adjusted = true;
         }
 
-        return {
-          ...item,
-          productPrice: validPrice,
-          originalPrice: live.originalPrice || item.originalPrice,
-          quantity: maxStock,
-          productName: live.productName || item.productName,
-          image: live.image || item.image,
-          cartQty: validQty
-        };
+        if (
+          validPrice !== item.productPrice ||
+          maxStock !== item.quantity ||
+          validQty !== item.cartQty ||
+          item.isActive === false
+        ) {
+          adjusted = true;
+          return {
+            ...item,
+            isActive: true,
+            productPrice: validPrice,
+            originalPrice: live.originalPrice || item.originalPrice,
+            quantity: maxStock,
+            productName: live.productName || item.productName,
+            image: live.image || item.image,
+            cartQty: validQty
+          };
+        }
+
+        return item;
       });
 
       if (adjusted) {
         setAuthoritativeNotice(
-          "Some item quantities were adjusted to match live stock."
+          "Some items in your cart were updated or are currently unavailable."
         );
+        setCart(verifiedCart);
       }
-
-      setCart(verifiedCart);
     } catch {
       // Offline fallback
     }
-  }, [cart, isAuthenticated, syncCloudCart]);
+  }, [isAuthenticated, isAdmin, syncCloudCart]);
 
   // -------------------------------------------------------------
   // Cart Actions (Cloud synchronized or Local guest)
   // -------------------------------------------------------------
   async function addToCart(product, qty = 1) {
+    if (isAdmin) return;
     const pId = product._id || product.productId;
 
     if (isAuthenticated) {
@@ -277,6 +336,7 @@ export function CartProvider({ children }) {
   }
 
   async function updateQty(productId, newQty) {
+    if (isAdmin) return;
     if (isAuthenticated) {
       try {
         const res = await authFetch(`${API_URL}/cart/items/${productId}`, {
@@ -309,6 +369,8 @@ export function CartProvider({ children }) {
   }
 
   async function removeFromCart(productId) {
+    if (isAdmin) return;
+
     if (isAuthenticated) {
       try {
         const res = await authFetch(`${API_URL}/cart/items/${productId}`, {
@@ -332,6 +394,8 @@ export function CartProvider({ children }) {
   }
 
   async function clearCart() {
+    if (isAdmin) return;
+
     if (isAuthenticated) {
       try {
         await authFetch(`${API_URL}/cart`, {
@@ -344,7 +408,7 @@ export function CartProvider({ children }) {
 
     setCart([]);
     try {
-      localStorage.removeItem(CART_STORAGE_KEY);
+      localStorage.removeItem(GUEST_CART_KEY);
     } catch {
       // Storage fallback
     }
@@ -354,6 +418,8 @@ export function CartProvider({ children }) {
   // Wishlist Actions
   // -------------------------------------------------------------
   function toggleWishlist(product) {
+    if (isAdmin) return;
+
     const pId = product._id || product.productId;
     setWishlist((prev) => {
       const exists = prev.some((item) => (item._id || item.productId) === pId);
@@ -379,18 +445,21 @@ export function CartProvider({ children }) {
   }
 
   function isInWishlist(productId) {
+    if (isAdmin) return false;
     return wishlist.some(
       (item) => (item._id || item.productId) === productId
     );
   }
 
   function removeFromWishlist(productId) {
+    if (isAdmin) return;
     setWishlist((prev) =>
       prev.filter((item) => (item._id || item.productId) !== productId)
     );
   }
 
   function moveToCart(product) {
+    if (isAdmin) return;
     addToCart(product, 1);
     removeFromWishlist(product._id || product.productId);
   }
@@ -398,17 +467,19 @@ export function CartProvider({ children }) {
   // -------------------------------------------------------------
   // Authoritative Totals Calculation
   // -------------------------------------------------------------
-  const itemsSubtotal = cart.reduce(
-    (sum, item) => sum + (item.productPrice || 0) * (item.cartQty || 1),
-    0
-  );
-  const delivery = cart.length > 0 ? (itemsSubtotal >= 100 ? 0.0 : 10.0) : 0;
-  const discount = cart.length > 0 ? 3.0 : 0;
+  const itemsSubtotal = isAdmin
+    ? 0
+    : cart.reduce(
+        (sum, item) => sum + (item.productPrice || 0) * (item.cartQty || 1),
+        0
+      );
+  const delivery = isAdmin || cart.length === 0 ? 0 : itemsSubtotal >= 100 ? 0.0 : 10.0;
+  const discount = isAdmin || cart.length === 0 ? 0 : 3.0;
   const grandTotal = Math.max(0, itemsSubtotal + delivery - discount);
-  const totalItemCount = cart.reduce(
-    (sum, item) => sum + (item.cartQty || 1),
-    0
-  );
+  const totalItemCount = isAdmin
+    ? 0
+    : cart.reduce((sum, item) => sum + (item.cartQty || 1), 0);
+  const wishlistCount = isAdmin ? 0 : wishlist.length;
 
   const value = {
     cart,
@@ -423,7 +494,7 @@ export function CartProvider({ children }) {
     removeFromWishlist,
     moveToCart,
     totalItemCount,
-    wishlistCount: wishlist.length,
+    wishlistCount,
     totals: {
       itemsSubtotal,
       delivery,

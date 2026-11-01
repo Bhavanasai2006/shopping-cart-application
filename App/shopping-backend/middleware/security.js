@@ -35,7 +35,7 @@ const corsOptions = {
 // 3. Rate Limiters
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: config.isTest ? 1000 : 100, // Limit each IP to 100 requests per window
+  max: config.isTest ? 1000 : config.isProduction ? 100 : 5000, // Generous limit in development to prevent lockouts
   standardHeaders: "draft-8",
   legacyHeaders: false,
   message: {
@@ -46,7 +46,7 @@ const globalLimiter = rateLimit({
 // Stricter rate limit for authentication endpoints to prevent brute force
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: config.isTest ? 5 : 10, // 10 attempts per 15 min window (5 in test to easily assert 429)
+  max: config.isTest ? 5 : config.isProduction ? 10 : 100, // 10 in prod, 100 in dev, 5 in test
   standardHeaders: "draft-8",
   legacyHeaders: false,
   skip: (req) => {
