@@ -47,6 +47,11 @@ function ProtectedRoute({ children, adminOnly = false }) {
     );
   }
 
+  // Administrators cannot access customer-only protected routes
+  if (!adminOnly && user?.role === "admin") {
+    return <Navigate to="/admin/dashboard" replace />;
+  }
+
   return children;
 }
 

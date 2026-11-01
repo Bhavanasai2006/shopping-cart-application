@@ -1,5 +1,6 @@
 import { useLocation, Link, Navigate } from "react-router-dom";
 import SkincareImage from "../components/SkincareImage";
+import { formatINR } from "../utils/formatCurrency";
 
 function OrderSuccess() {
   const location = useLocation();
@@ -82,7 +83,7 @@ function OrderSuccess() {
           <div className="success-meta-item">
             <span className="meta-label">Total Amount</span>
             <strong className="meta-value grand-price">
-              ${Number(order?.totalAmount || 0).toFixed(2)}
+              {formatINR(order?.totalAmount)}
             </strong>
           </div>
         </div>
@@ -123,11 +124,11 @@ function OrderSuccess() {
                   <div className="success-item-details">
                     <span className="success-item-name">{item.productName || "Skincare Item"}</span>
                     <span className="success-item-qty">
-                      Quantity: {item.quantity} × ${Number(item.price || 0).toFixed(2)}
+                      Quantity: {item.quantity} × {formatINR(item.price)}
                     </span>
                   </div>
                   <div className="success-item-subtotal">
-                    ${Number((item.lineTotal || (item.price * item.quantity)) || 0).toFixed(2)}
+                    {formatINR(item.lineTotal || (item.price * item.quantity))}
                   </div>
                 </div>
               ))}

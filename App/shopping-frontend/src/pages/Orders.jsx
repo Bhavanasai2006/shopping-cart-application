@@ -6,6 +6,7 @@ import { useToast } from "../context/ToastContext";
 import { sanitizeErrorMessage } from "../utils/security";
 import ConfirmModal from "../components/ConfirmModal";
 import SkincareImage from "../components/SkincareImage";
+import { formatINR } from "../utils/formatCurrency";
 
 function formatStatus(status) {
   switch (status) {
@@ -183,9 +184,9 @@ function Orders() {
                   <div className="order-header-right">
                     <div
                       className="order-total-badge"
-                      aria-label={`Total amount: $${Number(order.totalAmount).toFixed(2)}`}
+                      aria-label={`Total amount: ${formatINR(order.totalAmount)}`}
                     >
-                      Total: ${Number(order.totalAmount).toFixed(2)}
+                      Total: {formatINR(order.totalAmount)}
                     </div>
 
                     {isEligibleForCancel && (
@@ -224,10 +225,10 @@ function Orders() {
                       <span className="order-item-name">{item.productName || "Skincare Product"}</span>
                       <span className="order-item-qty">Qty: {item.quantity}</span>
                       <span className="order-item-price">
-                        ${Number(item.price || 0).toFixed(2)}
+                        {formatINR(item.price)}
                       </span>
                       <span className="order-item-subtotal">
-                        ${Number((item.lineTotal || (item.price * item.quantity)) || 0).toFixed(2)}
+                        {formatINR(item.lineTotal || (item.price * item.quantity))}
                       </span>
                     </div>
                   ))}

@@ -5,6 +5,7 @@ import SkincareImage from "../components/SkincareImage";
 import { useCart } from "../context/CartContext";
 import { useToast } from "../context/ToastContext";
 import { sanitizeErrorMessage } from "../utils/security";
+import { formatINR } from "../utils/formatCurrency";
 
 function ProductDetail() {
   const { id } = useParams();
@@ -73,8 +74,9 @@ function ProductDetail() {
   }
 
   const isFavorited = isInWishlist(product._id);
+  const isInactive = product?.isActive === false;
   const availableStock = product.quantity != null ? product.quantity : 0;
-  const isOutOfStock = availableStock <= 0;
+  const isOutOfStock = availableStock <= 0 || isInactive;
 
   function handleAddToCart() {
     if (isOutOfStock) return;
@@ -185,11 +187,11 @@ function ProductDetail() {
           <div className="detail-price-box">
             {product.originalPrice && (
               <span className="detail-struck-price" aria-label="Original price">
-                ${Number(product.originalPrice).toFixed(2)}
+                {formatINR(product.originalPrice)}
               </span>
             )}
             <span className="detail-final-price" aria-label="Current price">
-              ${Number(product.productPrice || 0).toFixed(2)}
+              {formatINR(product.productPrice)}
             </span>
           </div>
 
@@ -296,16 +298,20 @@ function ProductDetail() {
               onClick={handleAddToCart}
               disabled={isOutOfStock}
               aria-label={
-                isOutOfStock
+                isInactive
+                  ? "Product Currently Unavailable"
+                  : isOutOfStock
                   ? "Out of Stock"
-                  : `Add ${qty} to cart for $${(product.productPrice * qty).toFixed(2)}`
+                  : `Add ${qty} to cart for ${formatINR(product.productPrice * qty)}`
               }
             >
-              {isOutOfStock
+              {isInactive
+                ? "Currently Unavailable"
+                : isOutOfStock
                 ? "Out of Stock"
                 : added
                 ? "✓ Added to Cart"
-                : `Add to Cart • $${(product.productPrice * qty).toFixed(2)}`}
+                : `Add to Cart • ${formatINR(product.productPrice * qty)}`}
             </button>
           </div>
         </div>

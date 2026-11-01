@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import SkincareImage from "./SkincareImage";
 import { useCart } from "../context/CartContext";
 import { useToast } from "../context/ToastContext";
+import { formatINR } from "../utils/formatCurrency";
 
 function ProductDetailModal({ product, onClose, onAddToCart }) {
   const [activeTab, setActiveTab] = useState("description");
@@ -27,8 +28,9 @@ function ProductDetailModal({ product, onClose, onAddToCart }) {
   if (!product) return null;
 
   const isFavorited = isInWishlist(product._id);
+  const isInactive = product?.isActive === false;
   const availableStock = product.quantity != null ? product.quantity : 0;
-  const isOutOfStock = availableStock <= 0;
+  const isOutOfStock = availableStock <= 0 || isInactive;
 
   function handleAdd() {
     if (isOutOfStock) return;
@@ -215,11 +217,11 @@ function ProductDetailModal({ product, onClose, onAddToCart }) {
             <div className="price-row">
               {product.originalPrice && (
                 <span className="struck-price">
-                  ${Number(product.originalPrice).toFixed(2)}
+                  {formatINR(product.originalPrice)}
                 </span>
               )}
               <span className="current-price">
-                ${Number(product.productPrice || 0).toFixed(2)}
+                {formatINR(product.productPrice)}
               </span>
             </div>
           </div>
@@ -229,12 +231,20 @@ function ProductDetailModal({ product, onClose, onAddToCart }) {
             onClick={handleAdd}
             disabled={isOutOfStock}
             aria-label={
-              isOutOfStock
+              isInactive
+                ? "Product Currently Unavailable"
+                : isOutOfStock
                 ? "Out of Stock"
-                : `Add ${product.productName} to cart for $${Number(product.productPrice || 0).toFixed(2)}`
+                : `Add ${product.productName} to cart for ${formatINR(product.productPrice)}`
             }
           >
-            {isOutOfStock ? "Out of Stock" : added ? "✓ Added!" : "Add to Cart"}
+            {isInactive
+              ? "Currently Unavailable"
+              : isOutOfStock
+              ? "Out of Stock"
+              : added
+              ? "✓ Added!"
+              : "Add to Cart"}
           </button>
         </div>
       </div>

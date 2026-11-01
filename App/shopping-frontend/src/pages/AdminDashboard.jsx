@@ -150,14 +150,6 @@ function AdminDashboard() {
                   <span>Inspect order details & totals</span>
                 </div>
               </Link>
-
-              <Link to="/products" className="quick-action-tile">
-                <span className="quick-action-icon">🛍️</span>
-                <div className="quick-action-info">
-                  <strong>Live Storefront</strong>
-                  <span>Browse as a customer</span>
-                </div>
-              </Link>
             </div>
           </section>
 

@@ -156,16 +156,6 @@ function Navbar({ onSearchToggle }) {
                     My Orders
                   </Link>
 
-                  {user.role === "admin" && (
-                    <Link
-                      to="/admin/dashboard"
-                      className="admin-link-highlight"
-                      onClick={() => setMenuOpen(false)}
-                    >
-                      ★ Admin Dashboard
-                    </Link>
-                  )}
-
                   <div className="drawer-user-info">
                     <p>
                       Logged in as <strong>{user.username}</strong>

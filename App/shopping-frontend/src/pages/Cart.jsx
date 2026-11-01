@@ -7,6 +7,7 @@ import { useAuth } from "../context/AuthContext";
 import { useCart } from "../context/CartContext";
 import { useToast } from "../context/ToastContext";
 import { sanitizeErrorMessage } from "../utils/security";
+import { formatINR } from "../utils/formatCurrency";
 
 function Cart() {
   const { user, authFetch } = useAuth();
@@ -17,7 +18,6 @@ function Cart() {
     clearCart,
     totals,
     authoritativeNotice,
-    isSyncing,
     verifyAuthoritativeData
   } = useCart();
   const { showToast } = useToast();
@@ -42,6 +42,18 @@ function Cart() {
     }
 
     if (cart.length === 0) return;
+
+    const hasUnavailable = cart.some(
+      (item) => item.isActive === false || (item.quantity != null && item.quantity <= 0)
+    );
+    if (hasUnavailable) {
+      showToast({
+        type: "error",
+        message: "Please remove unavailable products from your cart before checkout."
+      });
+      return;
+    }
+
     navigate("/checkout");
   }
 
@@ -75,7 +87,7 @@ function Cart() {
           ‹
         </Link>
         <h1 className="cart-header-title">
-          My cart {isSyncing && <span className="sync-indicator" aria-label="Syncing with cloud">↻</span>}
+          My cart
         </h1>
 
         <div className="cart-header-right-actions">
@@ -155,6 +167,11 @@ function Cart() {
                         <span className="cart-item-category">
                           {item.category || "Skincare"} • {item.size || "50 ml"}
                         </span>
+                        {(item.isActive === false || (item.quantity != null && item.quantity <= 0)) && (
+                          <span className="cart-item-unavailable-tag" style={{ display: "inline-block", color: "#C0392B", fontSize: "0.78rem", fontWeight: 600, marginTop: "4px" }}>
+                            ⚠️ Product currently unavailable
+                          </span>
+                        )}
                       </div>
 
                       <button
@@ -174,14 +191,14 @@ function Cart() {
                             className="cart-item-orig-price"
                             aria-label="Original price"
                           >
-                            ${Number(item.originalPrice).toFixed(2)}
+                            {formatINR(item.originalPrice)}
                           </span>
                         )}
                         <span
                           className="cart-item-curr-price"
                           aria-label="Current price"
                         >
-                          ${Number(item.productPrice || 0).toFixed(2)}
+                          {formatINR(item.productPrice)}
                         </span>
                       </div>
 
@@ -234,23 +251,23 @@ function Cart() {
             <div className="summary-line">
               <span>Delivery:</span>
               <span>
-                {totals.delivery === 0 ? "Free" : `$${totals.delivery.toFixed(2)}`}
+                {totals.delivery === 0 ? "Free" : formatINR(totals.delivery)}
               </span>
             </div>
 
             <div className="summary-line">
               <span>Discount:</span>
-              <span className="discount-green">-${totals.discount.toFixed(2)}</span>
+              <span className="discount-green">-{formatINR(totals.discount)}</span>
             </div>
 
             <div className="summary-line total-before">
               <span>Total:</span>
-              <span>${(totals.itemsSubtotal + totals.delivery).toFixed(2)}</span>
+              <span>{formatINR(totals.itemsSubtotal + totals.delivery)}</span>
             </div>
 
             <div className="summary-line subtotal-highlight">
               <span>Subtotal:</span>
-              <strong>${totals.grandTotal.toFixed(2)}</strong>
+              <strong>{formatINR(totals.grandTotal)}</strong>
             </div>
           </div>
 
@@ -264,10 +281,10 @@ function Cart() {
           <div className="cart-sticky-checkout-bar">
             <div className="checkout-price-info">
               <span className="checkout-struck-price" aria-label="Original subtotal">
-                ${(totals.itemsSubtotal + totals.delivery).toFixed(2)}
+                {formatINR(totals.itemsSubtotal + totals.delivery)}
               </span>
               <span className="checkout-final-price" aria-label="Final subtotal">
-                ${totals.grandTotal.toFixed(2)}
+                {formatINR(totals.grandTotal)}
               </span>
             </div>
 
@@ -277,7 +294,7 @@ function Cart() {
               disabled={loading || cart.length === 0}
               aria-label={
                 totals.grandTotal > 0
-                  ? `Proceed to checkout for $${totals.grandTotal.toFixed(2)}`
+                  ? `Proceed to checkout for ${formatINR(totals.grandTotal)}`
                   : "Proceed to checkout"
               }
             >

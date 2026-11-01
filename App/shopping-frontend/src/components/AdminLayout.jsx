@@ -77,14 +77,6 @@ function AdminLayout({ children, title, subtitle, actionButton }) {
 
           {/* Right Header Controls */}
           <div className="admin-header-right">
-            <Link
-              to="/products"
-              className="admin-secondary-btn"
-              title="Switch to customer storefront"
-            >
-              <span aria-hidden="true">🛍️</span>
-              <span className="desktop-only-text">View Shop</span>
-            </Link>
 
             <div className="admin-user-badge" title={`Signed in as ${user?.username} (${user?.emailId})`}>
               <span className="admin-avatar" aria-hidden="true">👤</span>
@@ -155,13 +147,6 @@ function AdminLayout({ children, title, subtitle, actionButton }) {
             >
               📑 Customer Orders
             </NavLink>
-            <Link
-              to="/products"
-              onClick={() => setMobileMenuOpen(false)}
-              className="admin-mobile-item store-link"
-            >
-              🛍️ Return to Customer Shop
-            </Link>
           </nav>
         )}
       </header>

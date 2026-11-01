@@ -6,6 +6,7 @@ import { useToast } from "../context/ToastContext";
 import API_URL from "../api";
 import { sanitizeErrorMessage } from "../utils/security";
 import SkincareImage from "../components/SkincareImage";
+import { formatINR } from "../utils/formatCurrency";
 
 function generateClientUuid() {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -126,6 +127,13 @@ function Checkout() {
           productId: item._id || item.productId,
           quantity: item.cartQty
         }));
+
+      const hasUnavailable = cart.some(
+        (item) => item.isActive === false || (item.quantity != null && item.quantity <= 0)
+      );
+      if (hasUnavailable) {
+        throw new Error("One or more items in your cart are currently unavailable. Please return to your cart and remove them.");
+      }
 
       if (itemsPayload.length === 0) {
         throw new Error("No valid products found in shopping cart.");
@@ -421,11 +429,11 @@ function Checkout() {
                       <div className="checkout-item-details">
                         <span className="checkout-item-name">{item.productName}</span>
                         <span className="checkout-item-qty">
-                          Qty: {qty} × ${itemPrice.toFixed(2)}
+                          Qty: {qty} × {formatINR(itemPrice)}
                         </span>
                       </div>
                       <div className="checkout-item-total">
-                        ${lineTotal.toFixed(2)}
+                        {formatINR(lineTotal)}
                       </div>
                     </div>
                   );
@@ -435,7 +443,7 @@ function Checkout() {
               <div className="checkout-totals-block">
                 <div className="checkout-total-line">
                   <span>Items Subtotal</span>
-                  <strong>${totals.itemsSubtotal.toFixed(2)}</strong>
+                  <strong>{formatINR(totals.itemsSubtotal)}</strong>
                 </div>
 
                 <div className="checkout-total-line">
@@ -448,7 +456,7 @@ function Checkout() {
                 <div className="checkout-grand-total-line">
                   <span>Total Due</span>
                   <strong className="grand-total-amount">
-                    ${totals.grandTotal.toFixed(2)}
+                    {formatINR(totals.grandTotal)}
                   </strong>
                 </div>
               </div>
@@ -465,7 +473,7 @@ function Checkout() {
                 type="submit"
                 disabled={loading || cart.length === 0}
                 className="sole-primary-btn checkout-submit-btn"
-                aria-label={`Place order for $${totals.grandTotal.toFixed(2)}`}
+                aria-label={`Place order for ${formatINR(totals.grandTotal)}`}
               >
                 {loading ? (
                   <span className="btn-spinner-wrap">
@@ -473,7 +481,7 @@ function Checkout() {
                     Confirming Order...
                   </span>
                 ) : (
-                  `Place Order • $${totals.grandTotal.toFixed(2)}`
+                  `Place Order • ${formatINR(totals.grandTotal)}`
                 )}
               </button>
             </div>

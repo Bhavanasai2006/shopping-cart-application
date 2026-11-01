@@ -57,7 +57,11 @@ function AdminLogin() {
         message: `Welcome to SOLE Portal, ${loggedUser.username}!`
       });
 
-      const redirectPath = location.state?.from?.pathname || "/admin/dashboard";
+      const attempted = location.state?.from?.pathname;
+      const redirectPath =
+        attempted && attempted.startsWith("/admin") && attempted !== "/admin/login"
+          ? attempted
+          : "/admin/dashboard";
       navigate(redirectPath, { replace: true });
     } catch (err) {
       setErrorMessage(
@@ -75,10 +79,10 @@ function AdminLogin() {
     <div className="admin-login-wrapper">
       <div className="admin-login-card">
         <div className="admin-login-header">
-          <Link to="/products" className="admin-login-brand">
+          <div className="admin-login-brand">
             <img src="/sole-logo.png" alt="SOLE Logo" className="admin-login-icon" />
             <span>SOLE</span>
-          </Link>
+          </div>
           <span className="admin-login-badge">ADMINISTRATIVE ACCESS</span>
           <p className="admin-login-subtitle">
             Secure catalog, inventory & order management portal
@@ -142,10 +146,6 @@ function AdminLogin() {
             Customer shopping?{" "}
             <Link to="/login" className="admin-footer-link">
               Go to Customer Sign In
-            </Link>{" "}
-            or{" "}
-            <Link to="/products" className="admin-footer-link">
-              Browse Store
             </Link>
           </p>
           <small className="admin-security-notice">

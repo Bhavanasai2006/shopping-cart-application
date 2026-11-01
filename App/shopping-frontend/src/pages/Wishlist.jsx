@@ -2,12 +2,20 @@ import { Link } from "react-router-dom";
 import SkincareImage from "../components/SkincareImage";
 import { useCart } from "../context/CartContext";
 import { useToast } from "../context/ToastContext";
+import { formatINR } from "../utils/formatCurrency";
 
 function Wishlist() {
   const { wishlist, removeFromWishlist, moveToCart } = useCart();
   const { showToast } = useToast();
 
   function handleMoveToCart(item) {
+    if (item.isActive === false || (item.quantity != null && item.quantity <= 0)) {
+      showToast({
+        type: "error",
+        message: `${item.productName} is currently unavailable.`
+      });
+      return;
+    }
     moveToCart(item);
     showToast({
       type: "success",
@@ -94,6 +102,11 @@ function Wishlist() {
                     <span className="cart-item-category">
                       {item.category || "Skincare"} • {item.size || "50 ml"}
                     </span>
+                    {(item.isActive === false || (item.quantity != null && item.quantity <= 0)) && (
+                      <span className="wishlist-item-unavailable-tag" style={{ display: "inline-block", color: "#C0392B", fontSize: "0.78rem", fontWeight: 600, marginTop: "4px" }}>
+                        ⚠️ Product currently unavailable
+                      </span>
+                    )}
                   </div>
 
                   <button
@@ -113,23 +126,30 @@ function Wishlist() {
                         className="cart-item-orig-price"
                         aria-label="Original price"
                       >
-                        ${Number(item.originalPrice).toFixed(2)}
+                        {formatINR(item.originalPrice)}
                       </span>
                     )}
                     <span
                       className="cart-item-curr-price"
                       aria-label="Current price"
                     >
-                      ${Number(item.productPrice || 0).toFixed(2)}
+                      {formatINR(item.productPrice)}
                     </span>
                   </div>
 
                   <button
                     className="wishlist-move-btn"
                     onClick={() => handleMoveToCart(item)}
-                    aria-label={`Move ${item.productName} to cart`}
+                    disabled={item.isActive === false || (item.quantity != null && item.quantity <= 0)}
+                    aria-label={
+                      item.isActive === false || (item.quantity != null && item.quantity <= 0)
+                        ? `${item.productName} is currently unavailable`
+                        : `Move ${item.productName} to cart`
+                    }
                   >
-                    Move to Cart →
+                    {item.isActive === false || (item.quantity != null && item.quantity <= 0)
+                      ? "Unavailable"
+                      : "Move to Cart →"}
                   </button>
                 </div>
               </div>

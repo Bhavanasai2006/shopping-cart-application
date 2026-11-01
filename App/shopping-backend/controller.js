@@ -640,13 +640,14 @@ async function formatCartResponse(cartDoc) {
       continue;
     }
 
-    const availableStock = p.quantity != null ? p.quantity : 0;
+    const isProductActive = p.isActive !== false;
+    const availableStock = isProductActive && p.quantity != null ? p.quantity : 0;
     let qty = item.quantity;
-    if (qty > availableStock && availableStock > 0) {
+    if (!isProductActive) {
+      qty = item.quantity;
+    } else if (qty > availableStock && availableStock > 0) {
       qty = availableStock;
       itemsModified = true;
-    } else if (availableStock === 0) {
-      qty = 0;
     }
 
     validItems.push({
@@ -660,14 +661,14 @@ async function formatCartResponse(cartDoc) {
       category: p.category || "Skincare",
       image: p.image || "",
       quantity: availableStock,
-      cartQty: qty
+      cartQty: qty,
+      isActive: isProductActive
     });
   }
 
-  // Clean out deleted or zero-stock products if adjusted
+  // Clean out deleted (null reference) products if adjusted
   if (itemsModified) {
     cartDoc.items = validItems
-      .filter((i) => i.cartQty > 0)
       .map((i) => ({ productId: i.productId, quantity: i.cartQty }));
     await cartDoc.save();
   }

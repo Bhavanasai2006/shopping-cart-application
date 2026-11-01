@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" width="100%" height="100%">
+  
+    <defs>
+      <!-- Studio Lighting Background -->
+      <linearGradient id="bgGrad_hyaluronic_serum" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#F0F7FB" />
+        <stop offset="60%" stop-color="#F0F7FB" />
+        <stop offset="100%" stop-color="#D8E9F3" />
+      </linearGradient>
+
+      <!-- Radial Studio Ambient Light -->
+      <radialGradient id="studioLight_hyaluronic_serum" cx="50%" cy="30%" r="65%">
+        <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.75" />
+        <stop offset="50%" stop-color="#FFFFFF" stop-opacity="0.1" />
+        <stop offset="100%" stop-color="#000000" stop-opacity="0.04" />
+      </radialGradient>
+
+      <!-- Soft Ground Shadow -->
+      <radialGradient id="groundShadow_hyaluronic_serum" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" stop-color="#1A1816" stop-opacity="0.25" />
+        <stop offset="50%" stop-color="#1A1816" stop-opacity="0.10" />
+        <stop offset="100%" stop-color="#1A1816" stop-opacity="0" />
+      </radialGradient>
+
+      <!-- Packaging Body Gradient -->
+      <linearGradient id="bodyGrad_hyaluronic_serum" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="0%" stop-color="#B9D8E9" />
+        <stop offset="15%" stop-color="#E4F0F7" />
+        <stop offset="45%" stop-color="#FFFFFF" stop-opacity="0.6" />
+        <stop offset="70%" stop-color="#E4F0F7" />
+        <stop offset="100%" stop-color="#B9D8E9" />
+      </linearGradient>
+
+      <!-- Highlight Streak -->
+      <linearGradient id="highlightGrad_hyaluronic_serum" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0" />
+        <stop offset="50%" stop-color="#FFFFFF" stop-opacity="0.65" />
+        <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0" />
+      </linearGradient>
+
+      <!-- Metallic / Accent Gradient -->
+      <linearGradient id="metalGrad_hyaluronic_serum" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="0%" stop-color="#3F82A6" stop-opacity="0.8" />
+        <stop offset="35%" stop-color="#FFFFFF" stop-opacity="0.7" />
+        <stop offset="65%" stop-color="#3F82A6" />
+        <stop offset="100%" stop-color="#3F82A6" stop-opacity="0.6" />
+      </linearGradient>
+    </defs>
+  
+  <!-- Studio Background Canvas -->
+  <rect width="500" height="500" fill="url(#bgGrad_hyaluronic_serum)" />
+  <rect width="500" height="500" fill="url(#studioLight_hyaluronic_serum)" />
+
+  <!-- Subtle Studio Accent Glow -->
+  <circle cx="250" cy="270" r="180" fill="#3F82A6" opacity="0.08" />
+
+  <!-- Product Silhouette & Details -->
+  
+      <!-- Dropper Glass Silhouette -->
+      <!-- Ground Shadow -->
+      <ellipse cx="250" cy="445" rx="100" ry="20" fill="url(#groundShadow_hyaluronic_serum)" />
+
+      <!-- Bottle Body -->
+      <rect x="180" y="210" width="140" height="210" rx="20" fill="url(#bodyGrad_hyaluronic_serum)" />
+      
+      <!-- Liquid Level Line -->
+      <path d="M 183 260 Q 250 268 317 260 L 317 410 Q 317 418 310 418 L 190 418 Q 183 418 183 410 Z" fill="#6BB1D8" opacity="0.35" />
+
+      <!-- Internal Glass Pipette -->
+      <rect x="246" y="160" width="8" height="230" rx="3" fill="#FFFFFF" opacity="0.5" />
+      <circle cx="250" cy="390" r="6" fill="#FFFFFF" opacity="0.7" />
+
+      <!-- Specular Highlight Left & Right -->
+      <rect x="188" y="220" width="8" height="190" rx="4" fill="url(#highlightGrad_hyaluronic_serum)" />
+      <rect x="304" y="220" width="6" height="190" rx="3" fill="#FFFFFF" opacity="0.25" />
+
+      <!-- Bottle Curved Shoulder -->
+      <path d="M 180 220 Q 180 185 220 180 L 280 180 Q 320 185 320 220 Z" fill="url(#bodyGrad_hyaluronic_serum)" />
+
+      <!-- Neck & Pipette Collar -->
+      <rect x="225" y="155" width="50" height="28" rx="3" fill="url(#metalGrad_hyaluronic_serum)" />
+      <line x1="225" y1="162" x2="275" y2="162" stroke="#FFFFFF" stroke-width="1" opacity="0.6" />
+      <line x1="225" y1="175" x2="275" y2="175" stroke="#000000" stroke-width="0.8" opacity="0.2" />
+
+      <!-- Rubber Dropper Bulb -->
+      <path d="M 233 155 Q 230 110 250 100 Q 270 110 267 155 Z" fill="#FFFFFF" />
+      <!-- Dropper Bulb Highlight -->
+      <path d="M 239 150 Q 238 120 250 108" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" fill="none" opacity="0.4" />
+
+      <!-- Minimalist Luxury Label -->
+      <g transform="translate(192, 255)">
+        <!-- Label Base Plaque -->
+        <rect x="0" y="0" width="116" height="135" rx="3" fill="#FFFFFF" stroke="#3F82A6" stroke-width="0.6" />
+        
+        <!-- Subtle Inner Border -->
+        <rect x="4" y="4" width="108" height="127" rx="2" fill="none" stroke="#3F82A6" stroke-width="0.4" stroke-dasharray="2,2" opacity="0.6" />
+
+        <!-- Brand Name -->
+        <text x="58" y="28" font-family="Georgia, 'Times New Roman', serif" font-size="14" font-weight="700" letter-spacing="4" fill="#241E19" text-anchor="middle">S O L E</text>
+        <line x1="42" y1="36" x2="74" y2="36" stroke="#3F82A6" stroke-width="0.8" />
+
+        <!-- Product Name -->
+        <text x="58" y="56" font-family="'Helvetica Neue', Arial, sans-serif" font-size="8.5" font-weight="700" letter-spacing="1.5" fill="#2B2620" text-anchor="middle">HYALURONIC SERUM</text>
+        
+        <!-- Category / Subtitle -->
+        <text x="58" y="73" font-family="'Helvetica Neue', Arial, sans-serif" font-size="6" font-weight="500" letter-spacing="0.8" fill="#3F82A6" text-anchor="middle">Deep Moisture Hydration</text>
+
+        <!-- Graphic Motif Icon -->
+        <circle cx="58" cy="92" r="7" fill="none" stroke="#3F82A6" stroke-width="0.7" />
+        <circle cx="58" cy="92" r="3" fill="#3F82A6" opacity="0.5" />
+
+        <!-- Volume Spec -->
+        <text x="58" y="116" font-family="'Helvetica Neue', Arial, sans-serif" font-size="6" letter-spacing="1" fill="#786F66" text-anchor="middle">30 ml • 1.0 fl. oz.</text>
+      </g>
+    
+</svg>
