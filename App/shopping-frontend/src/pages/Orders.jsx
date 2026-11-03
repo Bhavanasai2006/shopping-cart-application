@@ -182,11 +182,17 @@ function Orders() {
                   </div>
 
                   <div className="order-header-right">
-                    <div
-                      className="order-total-badge"
-                      aria-label={`Total amount: ${formatINR(order.totalAmount)}`}
-                    >
-                      Total: {formatINR(order.totalAmount)}
+                    <div className="order-header-right-badges">
+                      <span className="order-demo-pill" title="Demo Transaction — No real money transferred">
+                        🛡️ {order.paymentMethod === "DEMO_UPI" ? "Demo UPI" : order.paymentMethod === "DEMO_COD" ? "Demo COD" : "Demo Simulation"}
+                        {order.paymentStatus === "demo_refunded" ? " • Refunded" : ""}
+                      </span>
+                      <div
+                        className="order-total-badge"
+                        aria-label={`Total amount: ${formatINR(order.totalAmount)}`}
+                      >
+                        Total: {formatINR(order.totalAmount)}
+                      </div>
                     </div>
 
                     {isEligibleForCancel && (

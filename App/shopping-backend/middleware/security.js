@@ -19,6 +19,11 @@ const corsOptions = {
       return callback(null, true);
     }
 
+    // In development, gracefully allow any localhost port
+    if (!config.isProduction && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+      return callback(null, true);
+    }
+
     return callback(new Error(`CORS blocked for origin: ${origin}`));
   },
   credentials: true,
@@ -27,7 +32,11 @@ const corsOptions = {
     "Content-Type",
     "Authorization",
     "X-Requested-With",
-    "Accept"
+    "Accept",
+    "Idempotency-Key",
+    "idempotency-key",
+    "x-idempotency-key",
+    "IDEMPOTENCY-KEY"
   ],
   maxAge: 86400 // Cache preflight for 24 hours
 };

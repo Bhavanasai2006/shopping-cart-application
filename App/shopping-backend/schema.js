@@ -253,6 +253,44 @@ const orderSchema = new mongoose.Schema(
       type: shippingAddressSchema,
       default: null
     },
+    // DEMO PAYMENT SYSTEM FIELDS
+    // Explicitly marks and records simulated payments; never records demo payments as genuine
+    isDemoPayment: {
+      type: Boolean,
+      default: true
+    },
+    paymentMethod: {
+      type: String,
+      enum: ["DEMO_SIMULATION", "DEMO_CARD", "DEMO_UPI", "DEMO_COD"],
+      default: "DEMO_SIMULATION"
+    },
+    paymentStatus: {
+      type: String,
+      enum: ["demo_pending", "demo_completed", "demo_failed", "demo_refunded"],
+      default: "demo_completed"
+    },
+    paymentSimulation: {
+      isDemo: {
+        type: Boolean,
+        default: true
+      },
+      disclaimer: {
+        type: String,
+        default: "DEMO PAYMENT — No real money is transferred."
+      },
+      transactionId: {
+        type: String,
+        default: null
+      },
+      simulatedAccount: {
+        type: String,
+        default: null
+      },
+      completedAt: {
+        type: Date,
+        default: null
+      }
+    },
     idempotencyKey: {
       type: String,
       sparse: true

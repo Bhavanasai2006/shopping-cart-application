@@ -153,7 +153,19 @@ const orderValidation = {
         )
         .min(1, "Order must contain at least one item")
         .max(100, "Cannot order more than 100 distinct items"),
-      shippingAddress: shippingAddressSchema.optional()
+      shippingAddress: shippingAddressSchema.optional(),
+      paymentMethod: z
+        .enum(["DEMO_SIMULATION", "DEMO_CARD", "DEMO_UPI", "DEMO_COD"], {
+          errorMap: () => ({ message: "Payment method must be DEMO_SIMULATION, DEMO_CARD, DEMO_UPI, or DEMO_COD" })
+        })
+        .default("DEMO_SIMULATION")
+        .optional(),
+      simulateFailure: z.boolean().optional(),
+      demoAccount: z
+        .string()
+        .trim()
+        .max(100, "Demo account description cannot exceed 100 characters")
+        .optional()
     })
     .strict()
 };

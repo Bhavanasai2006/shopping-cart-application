@@ -199,9 +199,14 @@ function AdminOrders() {
                     <span className="order-customer-email">({customerEmail})</span>
                   </div>
 
-                  <div className="order-total-badge">
-                    <span>Order Total:</span>
-                    <strong>${Number(order.totalAmount || 0).toFixed(2)}</strong>
+                  <div className="admin-order-totals-group">
+                    <span className="admin-demo-tag" title="Simulated Sandbox Order">
+                      🛡️ {order.paymentMethod || "DEMO_CARD"} ({order.paymentStatus || "demo_completed"})
+                    </span>
+                    <div className="order-total-badge">
+                      <span>Order Total:</span>
+                      <strong>${Number(order.totalAmount || 0).toFixed(2)}</strong>
+                    </div>
                   </div>
                 </div>
 

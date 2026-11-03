@@ -839,15 +839,66 @@ app.delete("/api/cart", authenticate, async (req, res, next) => {
 // ORDER ENDPOINTS
 // -------------------------------------------------------------
 
+// Middleware: Strictly reject real financial credentials
+const sensitivePaymentGuard = (req, res, next) => {
+  const PROHIBITED_CREDENTIAL_KEYS = [
+    "cvv", "cvc", "cardnumber", "card_number", "pan", "pin", "upipin", "upi_pin",
+    "otp", "bankaccount", "bankpassword", "netbankingpassword", "cardexpiry", "expirydate"
+  ];
+  const submittedKeys = Object.keys(req.body || {}).map((k) => k.toLowerCase());
+  const hasProhibited = PROHIBITED_CREDENTIAL_KEYS.some((pk) => submittedKeys.includes(pk));
+  if (hasProhibited) {
+    return res.status(400).json({
+      message: "Security error: Real financial credentials (CVV, Card Number, PIN, OTP) must never be submitted. This is a demo payment system."
+    });
+  }
+  next();
+};
+
 // PLACE ORDER / CHECKOUT (Secure, Transactional, Idempotent)
 // Protected API - Never trusts client-supplied prices, totals, or userId!
 app.post(
   "/api/orders",
   authenticate,
+  sensitivePaymentGuard,
   validate(orderValidation),
   async (req, res, next) => {
     try {
-      const { items, userId: sentUserId, shippingAddress } = req.body;
+      // SECURITY CHECK: Real financial credentials must NEVER be submitted
+      const PROHIBITED_CREDENTIAL_KEYS = [
+        "cvv", "cvc", "cardnumber", "card_number", "pan", "pin", "upipin", "upi_pin",
+        "otp", "bankaccount", "bankpassword", "netbankingpassword", "cardexpiry", "expirydate"
+      ];
+      const submittedKeys = Object.keys(req.body || {}).map((k) => k.toLowerCase());
+      const hasProhibited = PROHIBITED_CREDENTIAL_KEYS.some((pk) => submittedKeys.includes(pk));
+      if (hasProhibited) {
+        return res.status(400).json({
+          message: "Security error: Real financial credentials (CVV, Card Number, PIN, OTP) must never be submitted. This is a demo payment system."
+        });
+      }
+
+      const {
+        items,
+        userId: sentUserId,
+        shippingAddress,
+        paymentMethod: rawPaymentMethod,
+        simulateFailure,
+        demoAccount
+      } = req.body;
+
+      const paymentMethod = ["DEMO_SIMULATION", "DEMO_CARD", "DEMO_UPI", "DEMO_COD"].includes(rawPaymentMethod)
+        ? rawPaymentMethod
+        : "DEMO_SIMULATION";
+
+      // SIMULATE PAYMENT FAILURE: Safely abort without creating an order or touching inventory
+      if (simulateFailure === true) {
+        return res.status(402).json({
+          message: "Simulated Demo Payment Failed (Bank authorization declined). No charges were made, and your cart is preserved. Please retry with a valid demo method.",
+          paymentStatus: "demo_failed",
+          isDemoPayment: true,
+          canRetry: true
+        });
+      }
 
       // Extract client-generated idempotency key from headers or request body
       const rawKey =
@@ -901,7 +952,8 @@ app.post(
       // Compute request fingerprint for payload verification
       const fingerprintPayload = {
         items: normalizedItems,
-        shippingAddress: shippingAddress || null
+        shippingAddress: shippingAddress || null,
+        paymentMethod
       };
       const idempotencyFingerprint = crypto
         .createHash("sha256")
@@ -1022,14 +1074,24 @@ app.post(
                 {
                   status: "placed",
                   changedAt: new Date(),
-                  note: "Order placed successfully by customer"
+                  note: `Order placed successfully via ${paymentMethod} (Simulated Demo Payment)`
                 }
               ],
               shippingAddress: shippingAddress || null,
               idempotencyKey: idempotencyKey || null,
               idempotencyFingerprint: idempotencyKey
                 ? idempotencyFingerprint
-                : null
+                : null,
+              isDemoPayment: true,
+              paymentMethod,
+              paymentStatus: paymentMethod === "DEMO_COD" ? "demo_pending" : "demo_completed",
+              paymentSimulation: {
+                isDemo: true,
+                disclaimer: "DEMO PAYMENT — No real money is transferred.",
+                transactionId: `DEMO_TXN_${Date.now()}_${crypto.randomBytes(4).toString("hex").toUpperCase()}`,
+                simulatedAccount: demoAccount || (paymentMethod === "DEMO_UPI" ? "customer@demoupi" : paymentMethod === "DEMO_COD" ? "Cash on Delivery (Simulated)" : "Instant Sandbox Simulation"),
+                completedAt: new Date()
+              }
             }
           ],
           { session }
@@ -1063,6 +1125,10 @@ app.post(
           orderId: order._id,
           totalAmount,
           status: order.status,
+          isDemoPayment: true,
+          paymentMethod: order.paymentMethod,
+          paymentStatus: order.paymentStatus,
+          paymentSimulation: order.paymentSimulation,
           order
         });
       } catch (txnError) {
@@ -1216,6 +1282,9 @@ app.put(
         order.status = "cancelled";
         order.cancelledAt = new Date();
         order.cancellationReason = cancellationReason;
+        if (order.isDemoPayment) {
+          order.paymentStatus = "demo_refunded";
+        }
         order.statusHistory.push({
           status: "cancelled",
           changedAt: new Date(),
@@ -1560,6 +1629,9 @@ app.patch(
           order.status = "cancelled";
           order.cancelledAt = new Date();
           order.cancellationReason = note || "Cancelled by administrator";
+          if (order.isDemoPayment) {
+            order.paymentStatus = "demo_refunded";
+          }
           order.statusHistory.push({
             status: "cancelled",
             changedAt: new Date(),
@@ -1665,15 +1737,22 @@ async function closeDB() {
 
 // Start backend if executed directly
 if (require.main === module) {
-  connectDB()
-    .then(() => {
-      app.listen(config.PORT, () => {
-        console.log(`Backend running on port ${config.PORT}`);
-      });
-    })
-    .catch((err) => {
-      console.error("MongoDB Connection Error:", err.message);
-    });
+  const server = app.listen(config.PORT, () => {
+    console.log(`Backend running on port ${config.PORT}`);
+  });
+
+  server.on("error", (err) => {
+    if (err.code === "EADDRINUSE") {
+      console.error(`Port ${config.PORT} is already in use.`);
+    } else {
+      console.error("Server error:", err.message);
+    }
+  });
+
+  connectDB().catch((err) => {
+    console.error("MongoDB Connection Warning:", err.message);
+    console.error("Note: Ensure your current IP is whitelisted on MongoDB Atlas (Network Access -> Add IP Address).");
+  });
 }
 
 module.exports = { app, connectDB, closeDB };
