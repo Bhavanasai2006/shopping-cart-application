@@ -31,13 +31,7 @@ const {
   revokeAllUserTokens
 } = require("./services/tokenService");
 
-const {
-  securityHeaders,
-  corsOptions,
-  globalLimiter,
-  authLimiter,
-  sanitizeNoSql
-} = require("./middleware/security");
+const { corsOptions } = require("./middleware/security");
 
 const {
   authenticate,
@@ -45,39 +39,15 @@ const {
   requireCustomer
 } = require("./middleware/auth");
 
-const {
-  validate,
-  registerValidation,
-  loginValidation,
-  orderValidation,
-  refreshTokenValidation,
-  requestPasswordResetValidation,
-  resetPasswordValidation,
-  verifyEmailValidation,
-  objectIdParamValidation,
-  createProductValidation,
-  updateProductValidation,
-  cancelOrderValidation,
-  addressValidation,
-  updateOrderStatusValidation
-} = require("./middleware/validation");
-
 const { notFoundHandler, errorHandler } = require("./middleware/errorHandler");
 
 const app = express();
 
-// Security & Parsing Middlewares
-app.use(securityHeaders);
+// Middleware Pipeline: CORS and Parsing
 app.use(cors(corsOptions));
 app.use(cookieParser());
 app.use(express.json({ limit: config.BODY_LIMIT }));
 app.use(express.urlencoded({ extended: true, limit: config.BODY_LIMIT }));
-app.use(sanitizeNoSql);
-
-// Global Rate Limiting
-if (!config.isTest) {
-  app.use(globalLimiter);
-}
 
 // -------------------------------------------------------------
 // AUTHENTICATION & IDENTITY ENDPOINTS
@@ -86,8 +56,6 @@ if (!config.isTest) {
 // 1. REGISTER USER
 app.post(
   "/api/users",
-  authLimiter,
-  validate(registerValidation),
   async (req, res, next) => {
     try {
       const { username, emailId, age, password } = req.body;
@@ -133,8 +101,6 @@ app.post(
 // 2. LOGIN USER
 app.post(
   "/api/login",
-  authLimiter,
-  validate(loginValidation),
   async (req, res, next) => {
     try {
       const { emailId, password } = req.body;
@@ -221,7 +187,6 @@ app.post(
 // 3. REFRESH TOKEN (Rotation & Reuse Detection)
 app.post(
   "/api/auth/refresh",
-  validate(refreshTokenValidation),
   async (req, res, next) => {
     try {
       const rawToken = req.body?.refreshToken || req.cookies?.refreshToken;
@@ -384,8 +349,6 @@ app.post("/api/auth/change-password", authenticate, async (req, res, next) => {
 // 6. REQUEST PASSWORD RESET
 app.post(
   "/api/auth/request-password-reset",
-  authLimiter,
-  validate(requestPasswordResetValidation),
   async (req, res, next) => {
     try {
       const { emailId } = req.body;
@@ -418,8 +381,6 @@ app.post(
 // 7. SUBMIT PASSWORD RESET
 app.post(
   "/api/auth/reset-password",
-  authLimiter,
-  validate(resetPasswordValidation),
   async (req, res, next) => {
     try {
       const { token, newPassword } = req.body;
@@ -457,7 +418,6 @@ app.post(
 // 8. VERIFY EMAIL
 app.post(
   "/api/auth/verify-email",
-  validate(verifyEmailValidation),
   async (req, res, next) => {
     try {
       const { token } = req.body;
@@ -558,7 +518,7 @@ app.get("/api/products", async (req, res, next) => {
 });
 
 // GET PRODUCT BY ID (Authoritative product lookup)
-app.get("/api/products/:id", validate(objectIdParamValidation), async (req, res, next) => {
+app.get("/api/products/:id", async (req, res, next) => {
   try {
     const product = await Product.findById(req.params.id).select("-__v");
     if (!product || product.isActive === false) {
@@ -620,7 +580,6 @@ app.post(
   "/api/products",
   authenticate,
   requireAdmin,
-  validate(createProductValidation),
   createProductHandler
 );
 
@@ -880,7 +839,6 @@ app.get("/api/users/addresses", authenticate, async (req, res, next) => {
 app.post(
   "/api/users/addresses",
   authenticate,
-  validate(addressValidation),
   async (req, res, next) => {
     try {
       const user = await User.findById(req.user._id || req.user.id);
@@ -1003,7 +961,6 @@ app.post(
   "/api/orders",
   authenticate,
   sensitivePaymentGuard,
-  validate(orderValidation),
   async (req, res, next) => {
     try {
       // SECURITY CHECK: Real financial credentials must NEVER be submitted
@@ -1370,7 +1327,6 @@ app.get("/api/orders", authenticate, async (req, res, next) => {
 app.get(
   "/api/orders/:id",
   authenticate,
-  validate(objectIdParamValidation),
   async (req, res, next) => {
     try {
       const order = await Order.findById(req.params.id);
@@ -1400,8 +1356,6 @@ app.get(
 app.put(
   "/api/orders/:id/cancel",
   authenticate,
-  validate(objectIdParamValidation),
-  validate(cancelOrderValidation),
   async (req, res, next) => {
     try {
       const order = await Order.findById(req.params.id);
@@ -1591,7 +1545,6 @@ app.post(
   "/api/admin/products",
   authenticate,
   requireAdmin,
-  validate(createProductValidation),
   createProductHandler
 );
 
@@ -1600,7 +1553,6 @@ app.get(
   "/api/admin/products/:id",
   authenticate,
   requireAdmin,
-  validate(objectIdParamValidation),
   async (req, res, next) => {
     try {
       const product = await Product.findById(req.params.id).select("-__v");
@@ -1619,7 +1571,6 @@ app.patch(
   "/api/admin/products/:id",
   authenticate,
   requireAdmin,
-  validate(updateProductValidation),
   async (req, res, next) => {
     try {
       const product = await Product.findById(req.params.id);
@@ -1673,7 +1624,6 @@ app.delete(
   "/api/admin/products/:id",
   authenticate,
   requireAdmin,
-  validate(objectIdParamValidation),
   async (req, res, next) => {
     try {
       const product = await Product.findById(req.params.id);
@@ -1719,7 +1669,6 @@ app.post(
   "/api/admin/products/:id/reactivate",
   authenticate,
   requireAdmin,
-  validate(objectIdParamValidation),
   async (req, res, next) => {
     try {
       const product = await Product.findById(req.params.id);
@@ -1757,8 +1706,6 @@ app.patch(
   "/api/admin/orders/:id/status",
   authenticate,
   requireAdmin,
-  validate(objectIdParamValidation),
-  validate(updateOrderStatusValidation),
   async (req, res, next) => {
     try {
       const order = await Order.findById(req.params.id);
