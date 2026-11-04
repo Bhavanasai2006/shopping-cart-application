@@ -32,7 +32,7 @@ function ProtectedRoute({ children, adminOnly = false }) {
       <div className="sole-page-container">
         <div className="cart-empty-view" role="alert" aria-live="assertive">
           <div className="cart-empty-icon" aria-hidden="true">
-            🚫
+            
           </div>
           <h2>403 — Access Forbidden</h2>
           <p>

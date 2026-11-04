@@ -41,32 +41,57 @@ const corsOptions = {
   maxAge: 86400 // Cache preflight for 24 hours
 };
 
+const isLocalhostIp = (ip) => {
+  if (!ip) return true;
+  const cleanIp = ip.replace(/^::ffff:/, '');
+  return (
+    cleanIp === '127.0.0.1' ||
+    cleanIp === '::1' ||
+    cleanIp === 'localhost' ||
+    cleanIp.startsWith('192.168.') ||
+    cleanIp.startsWith('10.') ||
+    cleanIp.startsWith('172.') ||
+    cleanIp.startsWith('fe80:')
+  );
+};
+
 // 3. Rate Limiters
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: config.isTest ? 1000 : config.isProduction ? 100 : 5000, // Generous limit in development to prevent lockouts
-  standardHeaders: "draft-8",
+  max: config.isTest ? 1000 : config.isProduction ? 500 : 100000,
+  standardHeaders: 'draft-8',
   legacyHeaders: false,
+  skip: (req) => {
+    // In development or test, never lock out developers
+    if (!config.isProduction && !req.headers['x-test-rate-limit']) {
+      return true;
+    }
+    return false;
+  },
   message: {
-    message: "Too many requests from this IP, please try again after 15 minutes."
+    message: 'Too many requests from this IP, please try again after 15 minutes.'
   }
 });
 
 // Stricter rate limit for authentication endpoints to prevent brute force
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: config.isTest ? 5 : config.isProduction ? 10 : 100, // 10 in prod, 100 in dev, 5 in test
-  standardHeaders: "draft-8",
+  max: config.isTest ? 5 : config.isProduction ? 30 : 1000,
+  standardHeaders: 'draft-8',
   legacyHeaders: false,
   skip: (req) => {
     // In test environment, only enforce rate limiting when explicitly testing it
-    if (config.isTest && !req.headers["x-test-rate-limit"]) {
+    if (config.isTest) {
+      return !req.headers['x-test-rate-limit'];
+    }
+    // In development, never lock out developer testing
+    if (!config.isProduction && !req.headers['x-test-rate-limit']) {
       return true;
     }
     return false;
   },
   message: {
-    message: "Too many authentication attempts. Please try again after 15 minutes."
+    message: 'Too many authentication attempts. Please try again after 15 minutes.'
   }
 });
 

@@ -5,13 +5,13 @@ import { formatINR } from "../utils/formatCurrency";
 function formatPaymentMethodLabel(method, simAccount) {
   switch (method) {
     case "DEMO_UPI":
-      return `Simulated UPI (${simAccount || "Demo VPA"})`;
+      return `UPI - Simulated (${simAccount || "Instant Pay"})`;
     case "DEMO_COD":
-      return "Cash on Delivery (Demo COD)";
+      return "Cash on Delivery";
     case "DEMO_SIMULATION":
     case "DEMO_CARD":
     default:
-      return "Instant Demo Simulation";
+      return "Credit / Debit Card (Simulated)";
   }
 }
 
@@ -24,7 +24,7 @@ function OrderSuccess() {
     return (
       <div className="sole-page-container">
         <div className="order-success-card">
-          <div className="order-success-icon" aria-hidden="true">📦</div>
+          <div className="order-success-icon" aria-hidden="true"></div>
           <h1 className="order-success-title">Order Confirmation</h1>
           <p className="order-success-sub">
             Your orders are tracked under your account profile.
@@ -75,11 +75,11 @@ function OrderSuccess() {
           Your order has been placed and is being prepared with care by the SOLE team.
         </p>
 
-        {/* DEMO PAYMENT DISCLAIMER BANNER */}
+        {/* SIMULATION DISCLAIMER BANNER */}
         <div className="order-success-demo-disclaimer" role="alert">
-          <span className="demo-disclaimer-shield" aria-hidden="true">🛡️</span>
+          
           <div>
-            <strong>DEMO PAYMENT — No real money is transferred.</strong>
+            <strong>Payment Simulation Verified</strong>
             <p>
               This order was placed using a simulated payment channel. Product prices, live inventory deductions, and order records are verified by the backend.
             </p>
@@ -115,9 +115,9 @@ function OrderSuccess() {
           </div>
         </div>
 
-        {/* Simulated Demo Payment Details */}
+        {/* Simulated Payment Details */}
         <div className="order-success-section">
-          <h2 className="success-section-heading">Demo Payment Details</h2>
+          <h2 className="success-section-heading">Payment Details</h2>
           <div className="demo-payment-receipt-card">
             <div className="receipt-line">
               <span className="receipt-label">Payment Method:</span>
@@ -128,7 +128,7 @@ function OrderSuccess() {
             <div className="receipt-line">
               <span className="receipt-label">Transaction ID:</span>
               <code className="receipt-code">
-                {paymentSimulation?.transactionId || `DEMO_TXN_${String(orderId).slice(-8).toUpperCase()}`}
+                {paymentSimulation?.transactionId || `TXN_${String(orderId).slice(-8).toUpperCase()}`}
               </code>
             </div>
             <div className="receipt-line">
@@ -137,7 +137,7 @@ function OrderSuccess() {
                 {paymentStatus === "demo_completed"
                   ? "✓ Simulated Payment Complete"
                   : paymentStatus === "demo_pending"
-                  ? "⏳ Demo Payment Pending (COD)"
+                  ? "⏳ Payment Pending (COD)"
                   : paymentStatus}
               </span>
             </div>
@@ -158,7 +158,9 @@ function OrderSuccess() {
               <span className="address-locality">
                 {address.city}, {address.state} {address.postalCode}
               </span>
-              <span className="address-country">{address.country || "United States"}</span>
+              {address.country && (
+                <span className="address-country">{address.country}</span>
+              )}
             </div>
           </div>
         )}

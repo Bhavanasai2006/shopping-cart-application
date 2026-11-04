@@ -123,7 +123,7 @@ function Orders() {
           title="Profile"
           aria-label="View profile"
         >
-          👤
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
         </Link>
       </div>
 
@@ -134,7 +134,7 @@ function Orders() {
         </div>
       ) : error ? (
         <div className="cart-empty-view" role="alert">
-          <div className="cart-empty-icon" aria-hidden="true">⚠</div>
+          <div className="cart-empty-icon" aria-hidden="true">!</div>
           <h2>Unable to Load Orders</h2>
           <p>{error}</p>
           <button className="sole-primary-btn" onClick={fetchOrders}>
@@ -143,7 +143,7 @@ function Orders() {
         </div>
       ) : orders.length === 0 ? (
         <div className="cart-empty-view">
-          <div className="cart-empty-icon" aria-hidden="true">📦</div>
+          <div className="cart-empty-icon" aria-hidden="true"></div>
           <h2>No orders yet</h2>
           <p>When you complete a purchase, your order history and receipt details will appear here.</p>
           <Link to="/products">
@@ -183,8 +183,8 @@ function Orders() {
 
                   <div className="order-header-right">
                     <div className="order-header-right-badges">
-                      <span className="order-demo-pill" title="Demo Transaction — No real money transferred">
-                        🛡️ {order.paymentMethod === "DEMO_UPI" ? "Demo UPI" : order.paymentMethod === "DEMO_COD" ? "Demo COD" : "Demo Simulation"}
+                      <span className="order-demo-pill" title="Simulated Transaction — Sandbox Mode">
+                        {order.paymentMethod === "DEMO_UPI" ? "UPI (Simulated)" : order.paymentMethod === "DEMO_COD" ? "Cash on Delivery" : "Card (Simulated)"}
                         {order.paymentStatus === "demo_refunded" ? " • Refunded" : ""}
                       </span>
                       <div

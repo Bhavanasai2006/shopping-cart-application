@@ -39,7 +39,7 @@ function AdminLayout({ children, title, subtitle, actionButton }) {
                 isActive ? "admin-nav-item active" : "admin-nav-item"
               }
             >
-              <span className="admin-nav-icon" aria-hidden="true">📊</span>
+              
               Dashboard
             </NavLink>
 
@@ -50,7 +50,7 @@ function AdminLayout({ children, title, subtitle, actionButton }) {
                 isActive ? "admin-nav-item active" : "admin-nav-item"
               }
             >
-              <span className="admin-nav-icon" aria-hidden="true">📦</span>
+              
               Products
             </NavLink>
 
@@ -60,7 +60,7 @@ function AdminLayout({ children, title, subtitle, actionButton }) {
                 isActive ? "admin-nav-item active" : "admin-nav-item"
               }
             >
-              <span className="admin-nav-icon" aria-hidden="true">➕</span>
+              
               Add Product
             </NavLink>
 
@@ -70,7 +70,7 @@ function AdminLayout({ children, title, subtitle, actionButton }) {
                 isActive ? "admin-nav-item active" : "admin-nav-item"
               }
             >
-              <span className="admin-nav-icon" aria-hidden="true">📑</span>
+              
               Orders
             </NavLink>
           </nav>
@@ -79,7 +79,7 @@ function AdminLayout({ children, title, subtitle, actionButton }) {
           <div className="admin-header-right">
 
             <div className="admin-user-badge" title={`Signed in as ${user?.username} (${user?.emailId})`}>
-              <span className="admin-avatar" aria-hidden="true">👤</span>
+              
               <span className="admin-username desktop-only-text">{user?.username || "Admin"}</span>
             </div>
 
@@ -90,7 +90,7 @@ function AdminLayout({ children, title, subtitle, actionButton }) {
               title="Sign Out of Admin"
               aria-label="Sign out"
             >
-              <span aria-hidden="true">🚪</span>
+              
               <span className="desktop-only-text">Logout</span>
             </button>
 
@@ -117,7 +117,7 @@ function AdminLayout({ children, title, subtitle, actionButton }) {
                 isActive ? "admin-mobile-item active" : "admin-mobile-item"
               }
             >
-              📊 Dashboard
+              Dashboard
             </NavLink>
             <NavLink
               to="/admin/products"
@@ -127,7 +127,7 @@ function AdminLayout({ children, title, subtitle, actionButton }) {
                 isActive ? "admin-mobile-item active" : "admin-mobile-item"
               }
             >
-              📦 Products Catalog
+              Products Catalog
             </NavLink>
             <NavLink
               to="/admin/products/new"
@@ -136,7 +136,7 @@ function AdminLayout({ children, title, subtitle, actionButton }) {
                 isActive ? "admin-mobile-item active" : "admin-mobile-item"
               }
             >
-              ➕ Add New Product
+              Add New Product
             </NavLink>
             <NavLink
               to="/admin/orders"
@@ -145,7 +145,7 @@ function AdminLayout({ children, title, subtitle, actionButton }) {
                 isActive ? "admin-mobile-item active" : "admin-mobile-item"
               }
             >
-              📑 Customer Orders
+              Customer Orders
             </NavLink>
           </nav>
         )}

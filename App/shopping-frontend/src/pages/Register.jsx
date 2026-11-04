@@ -114,7 +114,7 @@ function Register() {
 
         {errorMessage && (
           <div className="auth-error-banner" role="alert">
-            <span aria-hidden="true">⚠</span>
+            <span aria-hidden="true">!</span>
             <span>{errorMessage}</span>
           </div>
         )}

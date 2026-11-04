@@ -58,6 +58,7 @@ const {
   createProductValidation,
   updateProductValidation,
   cancelOrderValidation,
+  addressValidation,
   updateOrderStatusValidation
 } = require("./middleware/validation");
 
@@ -294,7 +295,8 @@ async function getMeHandler(req, res, next) {
       emailId: user.emailId,
       age: user.age,
       role: user.role,
-      emailVerified: user.emailVerified
+      emailVerified: user.emailVerified,
+      savedAddresses: user.savedAddresses || []
     });
   } catch (err) {
     next(err);
@@ -855,6 +857,146 @@ const sensitivePaymentGuard = (req, res, next) => {
   next();
 };
 
+// -------------------------------------------------------------
+// SAVED ADDRESSES ENDPOINTS (Customer address management)
+// -------------------------------------------------------------
+
+// 1. GET ALL SAVED ADDRESSES
+app.get("/api/users/addresses", authenticate, async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user._id || req.user.id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    return res.json({
+      addresses: user.savedAddresses || []
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// 2. CREATE A NEW SAVED ADDRESS
+app.post(
+  "/api/users/addresses",
+  authenticate,
+  validate(addressValidation),
+  async (req, res, next) => {
+    try {
+      const user = await User.findById(req.user._id || req.user.id);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      if (!user.savedAddresses) {
+        user.savedAddresses = [];
+      }
+
+      const isFirst = user.savedAddresses.length === 0;
+      const shouldBeDefault = isFirst || Boolean(req.body.isDefault);
+
+      if (shouldBeDefault) {
+        user.savedAddresses.forEach((addr) => {
+          addr.isDefault = false;
+        });
+      }
+
+      const newAddr = {
+        _id: new mongoose.Types.ObjectId(),
+        fullName: req.body.fullName.trim(),
+        phone: req.body.phone.trim(),
+        addressLine1: req.body.addressLine1.trim(),
+        addressLine2: (req.body.addressLine2 || "").trim(),
+        city: req.body.city.trim(),
+        state: req.body.state.trim(),
+        postalCode: req.body.postalCode.trim(),
+        country: (req.body.country || "").trim(),
+        isDefault: shouldBeDefault
+      };
+
+      user.savedAddresses.push(newAddr);
+      await user.save();
+
+      const created = user.savedAddresses[user.savedAddresses.length - 1];
+
+      return res.status(201).json({
+        message: "Address saved successfully",
+        addresses: user.savedAddresses,
+        address: created
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// 3. DELETE A SAVED ADDRESS
+app.delete("/api/users/addresses/:addressId", authenticate, async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user._id || req.user.id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const addrIndex = (user.savedAddresses || []).findIndex(
+      (a) => a._id.toString() === req.params.addressId
+    );
+
+    if (addrIndex === -1) {
+      return res.status(404).json({ message: "Address not found" });
+    }
+
+    const wasDefault = user.savedAddresses[addrIndex].isDefault;
+    user.savedAddresses.splice(addrIndex, 1);
+
+    if (wasDefault && user.savedAddresses.length > 0) {
+      user.savedAddresses[0].isDefault = true;
+    }
+
+    await user.save();
+
+    return res.json({
+      message: "Address deleted successfully",
+      addresses: user.savedAddresses
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// 4. SET ADDRESS AS DEFAULT
+app.put("/api/users/addresses/:addressId/default", authenticate, async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user._id || req.user.id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    let found = false;
+    (user.savedAddresses || []).forEach((addr) => {
+      if (addr._id.toString() === req.params.addressId) {
+        addr.isDefault = true;
+        found = true;
+      } else {
+        addr.isDefault = false;
+      }
+    });
+
+    if (!found) {
+      return res.status(404).json({ message: "Address not found" });
+    }
+
+    await user.save();
+
+    return res.json({
+      message: "Default address updated",
+      addresses: user.savedAddresses
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // PLACE ORDER / CHECKOUT (Secure, Transactional, Idempotent)
 // Protected API - Never trusts client-supplied prices, totals, or userId!
 app.post(
@@ -898,6 +1040,42 @@ app.post(
           isDemoPayment: true,
           canRetry: true
         });
+      }
+
+      // If requested, save new shipping address to user's profile
+      let updatedUserSavedAddresses = null;
+      if (req.body.saveAddress && shippingAddress) {
+        try {
+          const authUser = await User.findById(req.user._id || req.user.id);
+          if (authUser) {
+            if (!authUser.savedAddresses) {
+              authUser.savedAddresses = [];
+            }
+            const isDuplicate = authUser.savedAddresses.some(
+              (a) =>
+                a.addressLine1.toLowerCase().trim() === shippingAddress.addressLine1.toLowerCase().trim() &&
+                a.postalCode.toLowerCase().trim() === shippingAddress.postalCode.toLowerCase().trim()
+            );
+            if (!isDuplicate) {
+              authUser.savedAddresses.push({
+                _id: new mongoose.Types.ObjectId(),
+                fullName: shippingAddress.fullName.trim(),
+                phone: shippingAddress.phone.trim(),
+                addressLine1: shippingAddress.addressLine1.trim(),
+                addressLine2: (shippingAddress.addressLine2 || "").trim(),
+                city: shippingAddress.city.trim(),
+                state: shippingAddress.state.trim(),
+                postalCode: shippingAddress.postalCode.trim(),
+                country: (shippingAddress.country || "").trim(),
+                isDefault: authUser.savedAddresses.length === 0
+              });
+              await authUser.save();
+            }
+            updatedUserSavedAddresses = authUser.savedAddresses;
+          }
+        } catch {
+          // Non-fatal if address autosave fails during order creation
+        }
       }
 
       // Extract client-generated idempotency key from headers or request body
@@ -1129,6 +1307,7 @@ app.post(
           paymentMethod: order.paymentMethod,
           paymentStatus: order.paymentStatus,
           paymentSimulation: order.paymentSimulation,
+          savedAddresses: updatedUserSavedAddresses,
           order
         });
       } catch (txnError) {

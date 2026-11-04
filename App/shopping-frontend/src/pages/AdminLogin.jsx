@@ -91,7 +91,7 @@ function AdminLogin() {
 
         {errorMessage && (
           <div className="auth-error-banner" role="alert">
-            <span aria-hidden="true">⚠</span>
+            <span aria-hidden="true">!</span>
             <span>{errorMessage}</span>
           </div>
         )}
@@ -149,7 +149,7 @@ function AdminLogin() {
             </Link>
           </p>
           <small className="admin-security-notice">
-            🔒 Protected administrative system. Unauthorized access attempts are monitored and logged.
+            Protected administrative system. Unauthorized access attempts are monitored and logged.
           </small>
         </div>
       </div>

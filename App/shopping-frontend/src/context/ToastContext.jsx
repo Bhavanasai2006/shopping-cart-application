@@ -50,7 +50,7 @@ function ToastContainer({ toasts, onClose }) {
           toast.type === "success"
             ? "✓"
             : toast.type === "error"
-            ? "⚠"
+            ? "!"
             : "ℹ";
 
         return (

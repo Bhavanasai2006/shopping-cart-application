@@ -49,13 +49,13 @@ function AdminDashboard() {
       subtitle="Overview of your skincare catalog, store inventory, and recent orders."
       actionButton={
         <Link to="/admin/products/new" className="sole-primary-btn admin-header-action-btn">
-          <span>➕</span> Add New Product
+          Add New Product
         </Link>
       }
     >
       {error && (
         <div className="auth-error-banner" role="alert">
-          <span aria-hidden="true">⚠</span>
+          <span aria-hidden="true">!</span>
           <span>{error}</span>
         </div>
       )}
@@ -71,7 +71,7 @@ function AdminDashboard() {
           <section className="admin-stats-grid" aria-label="Key Performance Metrics">
             <div className="admin-stat-card">
               <div className="stat-card-icon revenue-icon" aria-hidden="true">
-                💵
+                $
               </div>
               <div className="stat-card-data">
                 <span className="stat-label">Total Revenue</span>
@@ -87,7 +87,7 @@ function AdminDashboard() {
 
             <div className="admin-stat-card">
               <div className="stat-card-icon orders-icon" aria-hidden="true">
-                📑
+                
               </div>
               <div className="stat-card-data">
                 <span className="stat-label">Total Orders</span>
@@ -98,7 +98,7 @@ function AdminDashboard() {
 
             <div className="admin-stat-card">
               <div className="stat-card-icon products-icon" aria-hidden="true">
-                🌿
+                
               </div>
               <div className="stat-card-data">
                 <span className="stat-label">Catalog Products</span>
@@ -111,7 +111,7 @@ function AdminDashboard() {
 
             <div className={`admin-stat-card ${stats?.lowStockProducts > 0 ? "warning-highlight" : ""}`}>
               <div className="stat-card-icon alert-icon" aria-hidden="true">
-                ⚠️
+                !
               </div>
               <div className="stat-card-data">
                 <span className="stat-label">Low Stock (≤ 5 units)</span>
@@ -128,7 +128,7 @@ function AdminDashboard() {
             <h2>Quick Actions</h2>
             <div className="quick-actions-row">
               <Link to="/admin/products/new" className="quick-action-tile">
-                <span className="quick-action-icon">➕</span>
+                
                 <div className="quick-action-info">
                   <strong>Create Product</strong>
                   <span>Publish new skincare item</span>
@@ -136,7 +136,7 @@ function AdminDashboard() {
               </Link>
 
               <Link to="/admin/products" className="quick-action-tile">
-                <span className="quick-action-icon">📦</span>
+                
                 <div className="quick-action-info">
                   <strong>Manage Products</strong>
                   <span>Update prices, inventory & status</span>
@@ -144,7 +144,7 @@ function AdminDashboard() {
               </Link>
 
               <Link to="/admin/orders" className="quick-action-tile">
-                <span className="quick-action-icon">📑</span>
+                <span className="quick-action-icon"></span>
                 <div className="quick-action-info">
                   <strong>Customer Orders</strong>
                   <span>Inspect order details & totals</span>
@@ -232,7 +232,7 @@ function AdminDashboard() {
                             to={`/admin/products/edit/${p._id}`}
                             className="admin-table-action-link"
                           >
-                            ✏️ Edit
+                            Edit
                           </Link>
                         </td>
                       </tr>
