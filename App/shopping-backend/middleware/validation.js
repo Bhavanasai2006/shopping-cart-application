@@ -125,9 +125,61 @@ const shippingAddressSchema = z
       .trim()
       .max(60, "Country cannot exceed 60 characters")
       .optional()
-      .default("United States")
+      .default("")
   })
   .strict();
+
+// Saved Address Validation Schema
+const addressValidation = {
+  body: z
+    .object({
+      fullName: z
+        .string({ required_error: "Full name is required" })
+        .trim()
+        .min(2, "Full name must be at least 2 characters")
+        .max(80, "Full name cannot exceed 80 characters"),
+      phone: z
+        .string({ required_error: "Phone number is required" })
+        .trim()
+        .min(7, "Phone number must be at least 7 characters")
+        .max(20, "Phone number cannot exceed 20 characters"),
+      addressLine1: z
+        .string({ required_error: "Address line 1 is required" })
+        .trim()
+        .min(3, "Address line 1 must be at least 3 characters")
+        .max(120, "Address line 1 cannot exceed 120 characters"),
+      addressLine2: z
+        .string()
+        .trim()
+        .max(120, "Address line 2 cannot exceed 120 characters")
+        .optional()
+        .default(""),
+      city: z
+        .string({ required_error: "City is required" })
+        .trim()
+        .min(2, "City must be at least 2 characters")
+        .max(60, "City cannot exceed 60 characters"),
+      state: z
+        .string({ required_error: "State is required" })
+        .trim()
+        .min(2, "State must be at least 2 characters")
+        .max(60, "State cannot exceed 60 characters"),
+      postalCode: z
+        .string({ required_error: "Postal code is required" })
+        .trim()
+        .min(3, "Postal code must be at least 3 characters")
+        .max(20, "Postal code cannot exceed 20 characters"),
+      country: z
+        .string()
+        .trim()
+        .min(2, "Country must be at least 2 characters")
+        .max(60, "Country cannot exceed 60 characters")
+        .optional()
+        .default("India"),
+      isDefault: z.boolean().optional().default(false)
+    })
+    .strict()
+};
 
 // 3. Order Checkout Schema - Idempotent, validated items & shipping address
 const orderValidation = {
@@ -153,7 +205,20 @@ const orderValidation = {
         )
         .min(1, "Order must contain at least one item")
         .max(100, "Cannot order more than 100 distinct items"),
-      shippingAddress: shippingAddressSchema.optional()
+      shippingAddress: shippingAddressSchema.optional(),
+      paymentMethod: z
+        .enum(["DEMO_SIMULATION", "DEMO_CARD", "DEMO_UPI", "DEMO_COD"], {
+          errorMap: () => ({ message: "Payment method must be DEMO_SIMULATION, DEMO_CARD, DEMO_UPI, or DEMO_COD" })
+        })
+        .default("DEMO_SIMULATION")
+        .optional(),
+      simulateFailure: z.boolean().optional(),
+      demoAccount: z
+        .string()
+        .trim()
+        .max(100, "Demo account description cannot exceed 100 characters")
+        .optional(),
+      saveAddress: z.boolean().optional()
     })
     .strict()
 };
@@ -327,5 +392,6 @@ module.exports = {
   updateProductValidation,
   shippingAddressSchema,
   cancelOrderValidation,
+  addressValidation,
   updateOrderStatusValidation
 };

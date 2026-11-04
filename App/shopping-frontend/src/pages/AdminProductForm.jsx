@@ -197,7 +197,7 @@ function AdminProductForm({ isEdit = false }) {
           <div className="admin-form-card">
             {error && (
               <div className="auth-error-banner" role="alert">
-                <span aria-hidden="true">⚠</span>
+                <span aria-hidden="true">!</span>
                 <span>{error}</span>
               </div>
             )}

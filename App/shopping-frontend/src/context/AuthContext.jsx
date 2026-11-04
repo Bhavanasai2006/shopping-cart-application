@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useContext, useState, useEffect, useCallback } from "react";
 import API_URL from "../api";
 import { sanitizeErrorMessage } from "../utils/security";
 
@@ -313,6 +313,87 @@ export function AuthProvider({ children }) {
     return data;
   }
 
+  // -----------------------------------------------------------------
+  // Saved Addresses Management
+  // -----------------------------------------------------------------
+  const updateUserAddresses = useCallback((addresses) => {
+    if (Array.isArray(addresses)) {
+      setUser((prev) => (prev ? { ...prev, savedAddresses: addresses } : prev));
+    }
+  }, []);
+
+  const fetchSavedAddresses = useCallback(async () => {
+    try {
+      const res = await authFetch(`${API_URL}/users/addresses`);
+      if (!res.ok) return [];
+      const data = await res.json();
+      const addresses = data.addresses || [];
+      setUser((prev) => (prev ? { ...prev, savedAddresses: addresses } : prev));
+      return addresses;
+    } catch {
+      return [];
+    }
+  }, []);
+
+  const addSavedAddress = useCallback(async (addressData) => {
+    const res = await authFetch(`${API_URL}/users/addresses`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(addressData)
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      if (data.errors && Array.isArray(data.errors) && data.errors.length > 0) {
+        throw new Error(data.errors.map((e) => e.message).join(", "));
+      }
+      throw new Error(data.message || "Failed to save address");
+    }
+
+    if (data.addresses) {
+      setUser((prev) => (prev ? { ...prev, savedAddresses: data.addresses } : prev));
+    }
+
+    return data;
+  }, []);
+
+  const deleteSavedAddress = useCallback(async (addressId) => {
+    const res = await authFetch(`${API_URL}/users/addresses/${addressId}`, {
+      method: "DELETE"
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.message || "Failed to delete address");
+    }
+
+    if (data.addresses) {
+      setUser((prev) => (prev ? { ...prev, savedAddresses: data.addresses } : prev));
+    }
+
+    return data;
+  }, []);
+
+  const setDefaultSavedAddress = useCallback(async (addressId) => {
+    const res = await authFetch(`${API_URL}/users/addresses/${addressId}/default`, {
+      method: "PUT"
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.message || "Failed to set default address");
+    }
+
+    if (data.addresses) {
+      setUser((prev) => (prev ? { ...prev, savedAddresses: data.addresses } : prev));
+    }
+
+    return data;
+  }, []);
+
   const value = {
     user,
     loading,
@@ -322,6 +403,11 @@ export function AuthProvider({ children }) {
     logout,
     updateProfile,
     changePassword,
+    updateUserAddresses,
+    fetchSavedAddresses,
+    addSavedAddress,
+    deleteSavedAddress,
+    setDefaultSavedAddress,
     authFetch,
     getAccessToken
   };

@@ -1,6 +1,19 @@
-import { useLocation, Link, Navigate } from "react-router-dom";
+import { useLocation, Link } from "react-router-dom";
 import SkincareImage from "../components/SkincareImage";
 import { formatINR } from "../utils/formatCurrency";
+
+function formatPaymentMethodLabel(method, simAccount) {
+  switch (method) {
+    case "DEMO_UPI":
+      return `UPI - Simulated (${simAccount || "Instant Pay"})`;
+    case "DEMO_COD":
+      return "Cash on Delivery";
+    case "DEMO_SIMULATION":
+    case "DEMO_CARD":
+    default:
+      return "Credit / Debit Card (Simulated)";
+  }
+}
 
 function OrderSuccess() {
   const location = useLocation();
@@ -11,7 +24,7 @@ function OrderSuccess() {
     return (
       <div className="sole-page-container">
         <div className="order-success-card">
-          <div className="order-success-icon" aria-hidden="true">📦</div>
+          <div className="order-success-icon" aria-hidden="true"></div>
           <h1 className="order-success-title">Order Confirmation</h1>
           <p className="order-success-sub">
             Your orders are tracked under your account profile.
@@ -44,6 +57,9 @@ function OrderSuccess() {
       });
 
   const address = order?.shippingAddress;
+  const paymentSimulation = order?.paymentSimulation;
+  const paymentMethod = order?.paymentMethod || "DEMO_CARD";
+  const paymentStatus = order?.paymentStatus || "demo_completed";
 
   return (
     <div className="sole-page-container">
@@ -58,6 +74,17 @@ function OrderSuccess() {
         <p className="order-success-sub">
           Your order has been placed and is being prepared with care by the SOLE team.
         </p>
+
+        {/* SIMULATION DISCLAIMER BANNER */}
+        <div className="order-success-demo-disclaimer" role="alert">
+          
+          <div>
+            <strong>Payment Simulation Verified</strong>
+            <p>
+              This order was placed using a simulated payment channel. Product prices, live inventory deductions, and order records are verified by the backend.
+            </p>
+          </div>
+        </div>
 
         {/* Order Meta Bar */}
         <div className="order-success-meta-bar">
@@ -88,6 +115,35 @@ function OrderSuccess() {
           </div>
         </div>
 
+        {/* Simulated Payment Details */}
+        <div className="order-success-section">
+          <h2 className="success-section-heading">Payment Details</h2>
+          <div className="demo-payment-receipt-card">
+            <div className="receipt-line">
+              <span className="receipt-label">Payment Method:</span>
+              <strong className="receipt-val">
+                {formatPaymentMethodLabel(paymentMethod, paymentSimulation?.simulatedAccount)}
+              </strong>
+            </div>
+            <div className="receipt-line">
+              <span className="receipt-label">Transaction ID:</span>
+              <code className="receipt-code">
+                {paymentSimulation?.transactionId || `TXN_${String(orderId).slice(-8).toUpperCase()}`}
+              </code>
+            </div>
+            <div className="receipt-line">
+              <span className="receipt-label">Payment Status:</span>
+              <span className={`demo-status-tag status-${paymentStatus}`}>
+                {paymentStatus === "demo_completed"
+                  ? "✓ Simulated Payment Complete"
+                  : paymentStatus === "demo_pending"
+                  ? "⏳ Payment Pending (COD)"
+                  : paymentStatus}
+              </span>
+            </div>
+          </div>
+        </div>
+
         {/* Shipping Address Block */}
         {address && (
           <div className="order-success-section">
@@ -102,7 +158,9 @@ function OrderSuccess() {
               <span className="address-locality">
                 {address.city}, {address.state} {address.postalCode}
               </span>
-              <span className="address-country">{address.country || "United States"}</span>
+              {address.country && (
+                <span className="address-country">{address.country}</span>
+              )}
             </div>
           </div>
         )}

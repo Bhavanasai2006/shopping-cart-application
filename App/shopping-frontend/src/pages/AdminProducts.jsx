@@ -122,13 +122,13 @@ function AdminProducts() {
       subtitle="Create, edit, restock, or safely deactivate skincare products."
       actionButton={
         <Link to="/admin/products/new" className="sole-primary-btn admin-header-action-btn">
-          <span>➕</span> Add Product
+          Add Product
         </Link>
       }
     >
       {error && (
         <div className="auth-error-banner" role="alert">
-          <span aria-hidden="true">⚠</span>
+          <span aria-hidden="true">!</span>
           <span>{error}</span>
         </div>
       )}
@@ -138,7 +138,7 @@ function AdminProducts() {
         <div className="admin-filter-bar">
           {/* Search Box */}
           <div className="admin-search-wrapper">
-            <span className="search-icon-symbol" aria-hidden="true">🔍</span>
+            
             <input
               type="search"
               placeholder="Search products by name, description, ingredients..."
@@ -327,7 +327,7 @@ function AdminProducts() {
                             className="admin-action-btn edit-btn"
                             title="Edit product details & inventory"
                           >
-                            ✏️ Edit
+                            Edit
                           </Link>
 
                           {!isDeactivated ? (
@@ -337,7 +337,7 @@ function AdminProducts() {
                               className="admin-action-btn deactivate-btn"
                               title="Safely deactivate product"
                             >
-                              🚫 Deactivate
+                              Deactivate
                             </button>
                           ) : (
                             <button

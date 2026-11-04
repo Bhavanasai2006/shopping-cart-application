@@ -106,21 +106,21 @@ function Cart() {
             className="icon-circle-btn"
             aria-label={user ? "Profile" : "Sign In"}
           >
-            👤
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
           </Link>
         </div>
       </div>
 
       {authoritativeNotice && (
         <div className="authoritative-banner" role="status">
-          <span>ℹ️ {authoritativeNotice}</span>
+          <span>{authoritativeNotice}</span>
         </div>
       )}
 
       {cart.length === 0 ? (
         <div className="cart-empty-view">
           <div className="cart-empty-icon" aria-hidden="true">
-            🛍️
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg>
           </div>
           <h2>Your cart is empty</h2>
           <p>Explore our natural skincare collection and treat your skin.</p>
@@ -169,7 +169,7 @@ function Cart() {
                         </span>
                         {(item.isActive === false || (item.quantity != null && item.quantity <= 0)) && (
                           <span className="cart-item-unavailable-tag" style={{ display: "inline-block", color: "#C0392B", fontSize: "0.78rem", fontWeight: 600, marginTop: "4px" }}>
-                            ⚠️ Product currently unavailable
+                            Product currently unavailable
                           </span>
                         )}
                       </div>

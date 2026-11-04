@@ -112,7 +112,7 @@ function AdminOrders() {
     >
       {error && (
         <div className="auth-error-banner" role="alert">
-          <span aria-hidden="true">⚠</span>
+          <span aria-hidden="true">!</span>
           <span>{error}</span>
         </div>
       )}
@@ -135,7 +135,7 @@ function AdminOrders() {
 
         {/* Filter Input */}
         <div className="admin-search-wrapper" style={{ marginLeft: "auto", maxWidth: "340px" }}>
-          <span className="search-icon-symbol" aria-hidden="true">🔍</span>
+          
           <input
             type="search"
             placeholder="Search by order ID, customer email..."
@@ -199,9 +199,14 @@ function AdminOrders() {
                     <span className="order-customer-email">({customerEmail})</span>
                   </div>
 
-                  <div className="order-total-badge">
-                    <span>Order Total:</span>
-                    <strong>${Number(order.totalAmount || 0).toFixed(2)}</strong>
+                  <div className="admin-order-totals-group">
+                    <span className="admin-demo-tag" title="Simulated Order">
+                      {order.paymentMethod === "DEMO_UPI" ? "UPI (Simulated)" : order.paymentMethod === "DEMO_COD" ? "Cash on Delivery" : "Card (Simulated)"} ({order.paymentStatus === "demo_completed" ? "Completed" : order.paymentStatus === "demo_pending" ? "Pending" : order.paymentStatus === "demo_refunded" ? "Refunded" : order.paymentStatus})
+                    </span>
+                    <div className="order-total-badge">
+                      <span>Order Total:</span>
+                      <strong>${Number(order.totalAmount || 0).toFixed(2)}</strong>
+                    </div>
                   </div>
                 </div>
 
@@ -212,7 +217,7 @@ function AdminOrders() {
                     <span className="shipping-dest-text">
                       <strong>{addr.fullName}</strong> ({addr.phone}) • {addr.addressLine1}
                       {addr.addressLine2 ? `, ${addr.addressLine2}` : ""}, {addr.city},{" "}
-                      {addr.state} {addr.postalCode}, {addr.country || "United States"}
+                      {addr.state} {addr.postalCode}{addr.country ? `, ${addr.country}` : ""}
                     </span>
                   </div>
                 )}

@@ -1,5 +1,21 @@
 const mongoose = require("mongoose");
 
+// SAVED USER ADDRESS SUBDOCUMENT SCHEMA
+const savedAddressSchema = new mongoose.Schema(
+  {
+    fullName: { type: String, required: true, trim: true },
+    phone: { type: String, required: true, trim: true },
+    addressLine1: { type: String, required: true, trim: true },
+    addressLine2: { type: String, trim: true, default: "" },
+    city: { type: String, required: true, trim: true },
+    state: { type: String, required: true, trim: true },
+    postalCode: { type: String, required: true, trim: true },
+    country: { type: String, trim: true, default: "" },
+    isDefault: { type: Boolean, default: false }
+  },
+  { timestamps: true }
+);
+
 // USER SCHEMA
 const userSchema = new mongoose.Schema(
   {
@@ -191,7 +207,7 @@ const shippingAddressSchema = new mongoose.Schema(
     city: { type: String, required: true, trim: true },
     state: { type: String, required: true, trim: true },
     postalCode: { type: String, required: true, trim: true },
-    country: { type: String, trim: true, default: "United States" }
+    country: { type: String, trim: true, default: "" }
   },
   { _id: false }
 );
@@ -252,6 +268,44 @@ const orderSchema = new mongoose.Schema(
     shippingAddress: {
       type: shippingAddressSchema,
       default: null
+    },
+    // DEMO PAYMENT SYSTEM FIELDS
+    // Explicitly marks and records simulated payments; never records demo payments as genuine
+    isDemoPayment: {
+      type: Boolean,
+      default: true
+    },
+    paymentMethod: {
+      type: String,
+      enum: ["DEMO_SIMULATION", "DEMO_CARD", "DEMO_UPI", "DEMO_COD"],
+      default: "DEMO_SIMULATION"
+    },
+    paymentStatus: {
+      type: String,
+      enum: ["demo_pending", "demo_completed", "demo_failed", "demo_refunded"],
+      default: "demo_completed"
+    },
+    paymentSimulation: {
+      isDemo: {
+        type: Boolean,
+        default: true
+      },
+      disclaimer: {
+        type: String,
+        default: "DEMO PAYMENT — No real money is transferred."
+      },
+      transactionId: {
+        type: String,
+        default: null
+      },
+      simulatedAccount: {
+        type: String,
+        default: null
+      },
+      completedAt: {
+        type: Date,
+        default: null
+      }
     },
     idempotencyKey: {
       type: String,

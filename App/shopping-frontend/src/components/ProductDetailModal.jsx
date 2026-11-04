@@ -93,9 +93,9 @@ function ProductDetailModal({ product, onClose, onAddToCart }) {
           {/* Hero Botanical Image Stage */}
           <div className="detail-hero-stage">
             <div className="botanical-daisies" aria-hidden="true">
-              <span className="daisy d1">🌼</span>
-              <span className="daisy d2">🌸</span>
-              <span className="daisy d3">🌼</span>
+              
+              
+              
             </div>
             <SkincareImage
               name={product.productName}

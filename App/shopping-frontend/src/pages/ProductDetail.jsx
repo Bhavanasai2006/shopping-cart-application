@@ -61,7 +61,7 @@ function ProductDetail() {
       <div className="sole-page-container">
         <div className="cart-empty-view" role="alert">
           <div className="cart-empty-icon" aria-hidden="true">
-            🔍
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
           </div>
           <h2>Product Not Found</h2>
           <p>{error || "We couldn't locate this skincare item."}</p>
@@ -133,9 +133,9 @@ function ProductDetail() {
         {/* Botanical Hero Visual Stage */}
         <div className="detail-hero-stage">
           <div className="botanical-daisies" aria-hidden="true">
-            <span className="daisy d1">🌼</span>
-            <span className="daisy d2">🌸</span>
-            <span className="daisy d3">🌼</span>
+            
+            
+            
           </div>
           <SkincareImage
             name={product.productName}

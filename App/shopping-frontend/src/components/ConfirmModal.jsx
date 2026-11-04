@@ -47,7 +47,7 @@ function ConfirmModal({
       >
         <div className="confirm-modal-header">
           <span className="confirm-modal-icon" aria-hidden="true">
-            {destructive ? "⚠️" : "❓"}
+            {destructive ? "!" : "?"}
           </span>
           <h2 id="confirm-modal-title" className="confirm-modal-title">
             {title}
