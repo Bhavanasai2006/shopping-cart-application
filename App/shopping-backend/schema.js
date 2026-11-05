@@ -79,6 +79,10 @@ const userSchema = new mongoose.Schema(
     lockUntil: {
       type: Date,
       default: null
+    },
+    savedAddresses: {
+      type: [savedAddressSchema],
+      default: []
     }
   },
   {
