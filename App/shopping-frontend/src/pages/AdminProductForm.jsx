@@ -4,6 +4,7 @@ import API_URL from "../api";
 import { authFetch } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import AdminLayout from "../components/AdminLayout";
+import { formatINR } from "../utils/formatCurrency";
 import SkincareImage from "../components/SkincareImage";
 import { sanitizeErrorMessage, sanitizeImageUrl } from "../utils/security";
 
@@ -232,7 +233,7 @@ function AdminProductForm({ isEdit = false }) {
               <div className="form-row-2col">
                 <div className="form-field-group">
                   <label htmlFor="pprice">
-                    Selling Price ($) <span className="req-star">*</span>
+                    Selling Price (₹) <span className="req-star">*</span>
                   </label>
                   <input
                     id="pprice"
@@ -240,7 +241,7 @@ function AdminProductForm({ isEdit = false }) {
                     type="number"
                     min="0"
                     step="0.01"
-                    placeholder="97.00"
+                    placeholder="₹97"
                     value={form.productPrice}
                     onChange={handleChange}
                     required
@@ -248,14 +249,14 @@ function AdminProductForm({ isEdit = false }) {
                 </div>
 
                 <div className="form-field-group">
-                  <label htmlFor="porig">Original / Compare-At Price ($)</label>
+                  <label htmlFor="porig">Original / Compare-At Price (₹)</label>
                   <input
                     id="porig"
                     name="originalPrice"
                     type="number"
                     min="0"
                     step="0.01"
-                    placeholder="110.00"
+                    placeholder="₹110"
                     value={form.originalPrice}
                     onChange={handleChange}
                   />
@@ -430,11 +431,11 @@ function AdminProductForm({ isEdit = false }) {
 
                   <div className="preview-price-row">
                     <span className="preview-price">
-                      ${Number(form.productPrice || 0).toFixed(2)}
+                      {formatINR(form.productPrice)}
                     </span>
                     {form.originalPrice && (
                       <span className="preview-orig-price">
-                        ${Number(form.originalPrice).toFixed(2)}
+                        {formatINR(form.originalPrice)}
                       </span>
                     )}
                   </div>

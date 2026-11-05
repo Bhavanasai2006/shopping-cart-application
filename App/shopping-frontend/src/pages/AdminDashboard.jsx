@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import API_URL from "../api";
 import { useAuth, authFetch } from "../context/AuthContext";
 import AdminLayout from "../components/AdminLayout";
+import { formatINR } from "../utils/formatCurrency";
 import { sanitizeErrorMessage } from "../utils/security";
 
 function AdminDashboard() {
@@ -71,15 +72,12 @@ function AdminDashboard() {
           <section className="admin-stats-grid" aria-label="Key Performance Metrics">
             <div className="admin-stat-card">
               <div className="stat-card-icon revenue-icon" aria-hidden="true">
-                $
+                ₹
               </div>
               <div className="stat-card-data">
                 <span className="stat-label">Total Revenue</span>
                 <span className="stat-value">
-                  ${Number(stats?.totalRevenue || 0).toLocaleString("en-US", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2
-                  })}
+                  {formatINR(stats?.totalRevenue || 0)}
                 </span>
                 <span className="stat-sub">From customer orders</span>
               </div>
@@ -196,10 +194,10 @@ function AdminDashboard() {
                           <span className="category-pill">{p.category || "Skincare"}</span>
                         </td>
                         <td>
-                          <strong>${Number(p.productPrice || 0).toFixed(2)}</strong>
+                          <strong>{formatINR(p.productPrice)}</strong>
                           {p.originalPrice && (
                             <span className="table-sub-strike">
-                              {" "}${Number(p.originalPrice).toFixed(2)}
+                              {" "}{formatINR(p.originalPrice)}
                             </span>
                           )}
                         </td>

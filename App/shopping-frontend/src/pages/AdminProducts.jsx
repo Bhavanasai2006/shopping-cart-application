@@ -4,6 +4,7 @@ import API_URL from "../api";
 import { authFetch } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import AdminLayout from "../components/AdminLayout";
+import { formatINR } from "../utils/formatCurrency";
 import ConfirmModal from "../components/ConfirmModal";
 import SkincareImage from "../components/SkincareImage";
 import { sanitizeErrorMessage } from "../utils/security";
@@ -285,10 +286,10 @@ function AdminProducts() {
 
                       <td>
                         <div className="price-stack">
-                          <strong>${Number(p.productPrice || 0).toFixed(2)}</strong>
+                          <strong>{formatINR(p.productPrice)}</strong>
                           {p.originalPrice && (
                             <span className="table-sub-strike">
-                              ${Number(p.originalPrice).toFixed(2)}
+                              {formatINR(p.originalPrice)}
                             </span>
                           )}
                         </div>

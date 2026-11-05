@@ -3,6 +3,7 @@ import API_URL from "../api";
 import { authFetch } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import AdminLayout from "../components/AdminLayout";
+import { formatINR } from "../utils/formatCurrency";
 import { sanitizeErrorMessage } from "../utils/security";
 
 function formatStatus(status) {
@@ -126,10 +127,7 @@ function AdminOrders() {
         <div className="orders-summary-pill">
           <span>Gross Order Value:</span>
           <strong>
-            ${totalRevenue.toLocaleString("en-US", {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2
-            })}
+            {formatINR(totalRevenue)}
           </strong>
         </div>
 
@@ -205,7 +203,7 @@ function AdminOrders() {
                     </span>
                     <div className="order-total-badge">
                       <span>Order Total:</span>
-                      <strong>${Number(order.totalAmount || 0).toFixed(2)}</strong>
+                      <strong>{formatINR(order.totalAmount)}</strong>
                     </div>
                   </div>
                 </div>
@@ -237,10 +235,10 @@ function AdminOrders() {
                       {(order.items || []).map((item, idx) => (
                         <tr key={idx}>
                           <td>{item.productName || "Skincare Product"}</td>
-                          <td>${Number(item.price || 0).toFixed(2)}</td>
+                          <td>{formatINR(item.price)}</td>
                           <td>× {item.quantity}</td>
                           <td className="text-right">
-                            ${(Number(item.lineTotal || (item.price * item.quantity)) || 0).toFixed(2)}
+                            {formatINR(item.lineTotal || (item.price * item.quantity))}
                           </td>
                         </tr>
                       ))}
